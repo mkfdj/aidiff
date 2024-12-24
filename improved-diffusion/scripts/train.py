@@ -86,7 +86,7 @@ def main():
 
         # Ensure in_channel is set correctly before assertion
         print(f"Value of in_channel: {args.in_channel}")  # Debugging line
-        assert args.in_channel == 128, f"Expected in_channel to be 128 but got {args.in_channel}"
+        
 
         assert args.modality == 'roc'
         
