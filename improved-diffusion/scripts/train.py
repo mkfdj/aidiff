@@ -6,6 +6,7 @@ import argparse
 import json, torch, os
 import numpy as np
 import torch_xla.core.xla_model as xm
+import torch_xla
 from improved_diffusion import dist_util, logger
 from improved_diffusion.image_datasets import load_data
 from improved_diffusion.text_datasets import load_data_text

@@ -24,6 +24,8 @@ import os
 import random
 import re
 import threading
+import torch_xla.core.xla_model as xm
+import torch_xla 
 import time
 from typing import Any, Dict, NamedTuple, Optional, Tuple, Union
 
@@ -43,6 +45,7 @@ from .file_utils import (
 if is_torch_available():
     import torch
     import torch_xla.core.xla_model as xm
+    import torch_xla 
 
 if is_tf_available():
     import tensorflow as tf

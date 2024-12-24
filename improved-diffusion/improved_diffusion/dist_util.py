@@ -11,6 +11,7 @@ from mpi4py import MPI
 import torch as th
 import torch.distributed as dist
 import torch_xla.core.xla_model as xm
+import torch_xla 
 
 # Change this to reflect your cluster layout.
 # The GPU for a given rank is (rank % GPUS_PER_NODE).
