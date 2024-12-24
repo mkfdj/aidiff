@@ -273,7 +273,7 @@ def main():
     else:
          # Debugging output
          print(f"Value of in_channel: {args.in_channel}")  # Debugging line
-         assert args.in_channel == 64, f"Expected in_channel to be 64 but got {args.in_channel}"
+         assert args.in_channel == 128, f"Expected in_channel to be 64 but got {args.in_channel}"
 
          print('load data', '*' * 50)
          if args.modality == 'roc-aug' or args.modality == 'commonGen-aug':
