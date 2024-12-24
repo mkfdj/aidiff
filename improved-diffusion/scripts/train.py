@@ -88,7 +88,6 @@ def main():
         print(f"Value of in_channel: {args.in_channel}")  # Debugging line
         
 
-        assert args.modality == 'roc'
         
         data = load_data_text(
             data_dir=args.data_dir,
