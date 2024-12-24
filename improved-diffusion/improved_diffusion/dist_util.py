@@ -27,11 +27,11 @@ def setup_dist():
     if dist.is_initialized():
         return
 
-    # Set the device to use for torch.distributed
-    device = xm.xla_device()
-
     comm = MPI.COMM_WORLD
-    backend = "gloo" if not xm.is_available() else "xla"
+    
+    # Check for available XLA devices
+    devices = xm.get_xla_supported_devices()
+    backend = "gloo" if len(devices) == 0 else "xla"
 
     if backend == "gloo":
         hostname = "localhost"
