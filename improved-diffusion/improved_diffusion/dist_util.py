@@ -27,7 +27,7 @@ def setup_dist():
         return
 
     comm = MPI.COMM_WORLD
-    backend = "gloo" if not th.to(xm.xla_device()).is_available() else "nccl"
+    backend = "gloo" if not xm.is_available() else "nccl"
 
     if backend == "gloo":
         hostname = "localhost"
