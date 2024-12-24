@@ -52,13 +52,14 @@ if is_tf_available():
 
 
 def set_seed(seed: int):
-    """ Helper function for reproducible behavior to set the seed in `random`, `numpy`, `torch` and/or `tf`. """
+    """ Helper function for reproducible behavior to set the seed in `random`, `numpy`, `torch`, and/or `tf`. """
     random.seed(seed)
     np.random.seed(seed)
     
     if is_torch_available():
        torch.manual_seed(seed)
-       xm.set_rng_state(seed)  # Set RNG state for XLA devices
+       
+   xm.set_rng_state(seed)  # Set RNG state for XLA devices
 
 class EvalPrediction(NamedTuple):
     """
@@ -239,12 +240,12 @@ default_hp_space = {
 }
 
 
+
 def is_main_process(local_rank):
    """ Whether or not the current process is the local process based on TPU ordinal. """
    if is_torch_tpu_available():
        return xm.get_ordinal() == 0 
    return local_rank in [-1, 0]
-
 
 def total_processes_number(local_rank):
    """ Return the number of processes launched in parallel. Works with TPUs. """
