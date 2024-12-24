@@ -52,21 +52,13 @@ if is_tf_available():
 
 
 def set_seed(seed: int):
-    """
-    Helper function for reproducible behavior to set the seed in `random`, `numpy`, `torch` and/or `tf` (if installed).
-
-    Args:
-        seed (`int`): The seed to set.
-    """
+    """ Helper function for reproducible behavior to set the seed in `random`, `numpy`, `torch` and/or `tf`. """
     random.seed(seed)
     np.random.seed(seed)
+    
     if is_torch_available():
-        torch.manual_seed(seed)
-        xm.set_rng_state(seed)
-        # ^^ safe to call this function even if cuda is not available
-    if is_tf_available():
-        tf.random.set_seed(seed)
-
+       torch.manual_seed(seed)
+       xm.set_rng_state(seed)  # Set RNG state for XLA devices
 
 class EvalPrediction(NamedTuple):
     """
@@ -248,34 +240,22 @@ default_hp_space = {
 
 
 def is_main_process(local_rank):
-    """
-    Whether or not the current process is the local process, based on `xm.get_ordinal()` (for TPUs) first, then on
-    `local_rank`.
-    """
-    if is_torch_tpu_available():
-        import torch_xla.core.xla_model as xm
-
-        return xm.get_ordinal() == 0
-    return local_rank in [-1, 0]
+   """ Whether or not the current process is the local process based on TPU ordinal. """
+   if is_torch_tpu_available():
+       return xm.get_ordinal() == 0 
+   return local_rank in [-1, 0]
 
 
 def total_processes_number(local_rank):
-    """
-    Return the number of processes launched in parallel. Works with `torch.distributed` and TPUs.
-    """
-    if is_torch_tpu_available():
-        import torch_xla.core.xla_model as xm
-
-        return xm.xrt_world_size()
-    elif is_sagemaker_dp_enabled():
-        import smdistributed.dataparallel.torch.distributed as dist
-
-        return dist.get_world_size()
-    elif local_rank != -1 and is_torch_available():
-        import torch
-
-        return torch.distributed.get_world_size()
-    return 1
+   """ Return the number of processes launched in parallel. Works with TPUs. """
+   if is_torch_tpu_available():
+       return xm.xrt_world_size()
+   elif is_sagemaker_dp_enabled():
+       import smdistributed.dataparallel.torch.distributed as dist
+       return dist.get_world_size()
+   elif local_rank != -1 and is_torch_available():
+       return torch.distributed.get_world_size()
+   return 1
 
 
 def speed_metrics(split, start_time, num_samples=None, num_steps=None):

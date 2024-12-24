@@ -46,14 +46,14 @@ def setup_dist():
     port = comm.bcast(_find_free_port(), root=0)
     os.environ["MASTER_PORT"] = str(port)
 
-    # Use xm.xla_device() directly without calling init_process_group for XLA
+    # For TPUs, we do not call init_process_group in the same way
     if backend == "xla":
-        # For TPUs, we do not call init_process_group in the same way
         print("Using TPU with XLA backend.")
-        # You can set up additional TPU configuration here if needed
+        # Additional TPU configuration can be added here if needed
     else:
         # Initialize the process group for CPU/GPU
         dist.init_process_group(backend=backend, init_method="env://")
+
 
 
 def dev():

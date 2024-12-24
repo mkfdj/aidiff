@@ -28,24 +28,26 @@ import wandb
 
 def main():
     args = create_argparser().parse_args()
-    set_seed(args.seed) 
-    dist_util.setup_dist() # DEBUG **
+    set_seed(args.seed)
+    
+    dist_util.setup_dist()  # Set up distributed training
+
     logger.configure()
-
-
     logger.log("creating model and diffusion...")
+    
     model, diffusion = create_model_and_diffusion(
         **args_to_dict(args, model_and_diffusion_defaults().keys())
     )
-    model.to(dist_util.dev()) #  DEBUG **
-    # model.to(xm.xla_device())() #  DEBUG **
+    
+    model.to(xm.xla_device())  # Move model to TPU device
 
     pytorch_total_params = sum(p.numel() for p in model.parameters())
-
     logger.log(f'the parameter count is {pytorch_total_params}')
-    schedule_sampler = create_named_schedule_sampler(args.schedule_sampler, diffusion)
 
+    schedule_sampler = create_named_schedule_sampler(args.schedule_sampler, diffusion)
+    
     logger.log(f'saving the hyperparameters to {args.checkpoint_path}/training_args.json')
+    
     with open(f'{args.checkpoint_path}/training_args.json', 'w') as f:
         json.dump(args.__dict__, f, indent=2)
 
@@ -130,19 +132,18 @@ def main():
     # import time
     # while not os.path.exists(os.path.join(args.checkpoint_path, 'vocab.json')):
     #     time.sleep(1)
-    def get_mapping_func(args, diffusion, data):
-        model2, tokenizer = load_models(args.modality, args.experiment, args.model_name_or_path, args.in_channel,
-                                        args.checkpoint_path, extra_args=args)
+def get_mapping_func(args, diffusion, data):
+        model2, tokenizer = load_models(args.modality, args.experiment, args.model_name_or_path, args.in_channel, args.checkpoint_path, extra_args=args)
         model3 = get_weights(model2, args)
-        print(model3, model3.weight.requires_grad)
-        mapping_func = partial(compute_logp, args, model3.to(xm.xla_device())())
+        mapping_func = partial(compute_logp, args, model3.to(xm.xla_device()))  # Ensure model is on TPU
         diffusion.mapping_func = mapping_func
         return mapping_func
 
-    get_mapping_func(args, diffusion, data)
+get_mapping_func(args, diffusion, data)
 
-    logger.log("training...")
-    TrainLoop(
+logger.log("training...")
+    
+TrainLoop(
         model=model,
         diffusion=diffusion,
         data=data,
