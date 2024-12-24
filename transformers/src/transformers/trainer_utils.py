@@ -42,6 +42,7 @@ from .file_utils import (
 
 if is_torch_available():
     import torch
+    import torch_xla.core.xla_model as xm
 
 if is_tf_available():
     import tensorflow as tf
@@ -58,7 +59,7 @@ def set_seed(seed: int):
     np.random.seed(seed)
     if is_torch_available():
         torch.manual_seed(seed)
-        torch.to(xm.xla_device()).manual_seed_all(seed)
+        xm.manual_seed_all(seed)
         # ^^ safe to call this function even if cuda is not available
     if is_tf_available():
         tf.random.set_seed(seed)
