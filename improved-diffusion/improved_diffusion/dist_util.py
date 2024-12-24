@@ -11,15 +11,12 @@ from mpi4py import MPI
 import torch as th
 import torch.distributed as dist
 import torch_xla.core.xla_model as xm
-import torch_xla 
 
 # Change this to reflect your cluster layout.
 # The GPU for a given rank is (rank % GPUS_PER_NODE).
-GPUS_PER_NODE = 1 #8
+GPUS_PER_NODE = 1  # Adjust as needed for your setup
 
 SETUP_RETRY_COUNT = 3
-
-
 
 def setup_dist():
     """
@@ -32,37 +29,35 @@ def setup_dist():
     
     # Check for available XLA devices
     devices = xm.get_xla_supported_devices()
-    backend = "gloo" if len(devices) == 0 else "xla"
+    backend = "xla" if devices else "gloo"
 
-    if backend == "gloo":
-        hostname = "localhost"
-    else:
-        hostname = socket.gethostbyname(socket.getfqdn())
+    # Determine hostname based on backend
+    hostname = socket.gethostbyname(socket.getfqdn()) if backend == "xla" else "localhost"
     
+    # Set environment variables for distributed training
     os.environ["MASTER_ADDR"] = comm.bcast(hostname, root=0)
     os.environ["RANK"] = str(comm.rank)
     os.environ["WORLD_SIZE"] = str(comm.size)
 
+    # Find and broadcast a free port for communication
     port = comm.bcast(_find_free_port(), root=0)
     os.environ["MASTER_PORT"] = str(port)
 
-    # For TPUs, we do not call init_process_group in the same way
+    # Initialize the process group based on the selected backend
     if backend == "xla":
         print("Using TPU with XLA backend.")
         # Additional TPU configuration can be added here if needed
+        # Example: xm.init() or other TPU-specific settings can be added here.
+        
     else:
-        # Initialize the process group for CPU/GPU
+        print("Using Gloo backend for CPU/GPU.")
         dist.init_process_group(backend=backend, init_method="env://")
-
-
 
 def dev():
     """
     Get the device to use for torch.distributed.
     """
-
     return xm.xla_device()
-
 
 def load_state_dict(path, **kwargs):
     """
@@ -76,7 +71,6 @@ def load_state_dict(path, **kwargs):
     data = MPI.COMM_WORLD.bcast(data)
     return th.load(io.BytesIO(data), **kwargs)
 
-
 def sync_params(params):
     """
     Synchronize a sequence of Tensors across ranks from rank 0.
@@ -85,8 +79,8 @@ def sync_params(params):
         with th.no_grad():
             dist.broadcast(p, 0)
 
-
 def _find_free_port():
+    """Find a free port on the system."""
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.bind(("", 0))
