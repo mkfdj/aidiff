@@ -59,7 +59,7 @@ def set_seed(seed: int):
     np.random.seed(seed)
     if is_torch_available():
         torch.manual_seed(seed)
-        xm.manual_seed_all(seed)
+        xm.set_rng_state(seed)
         # ^^ safe to call this function even if cuda is not available
     if is_tf_available():
         tf.random.set_seed(seed)
