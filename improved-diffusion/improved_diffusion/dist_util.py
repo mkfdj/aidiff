@@ -19,6 +19,7 @@ GPUS_PER_NODE = 1 #8
 SETUP_RETRY_COUNT = 3
 
 
+
 def setup_dist():
     """
     Setup a distributed process group.
@@ -26,19 +27,25 @@ def setup_dist():
     if dist.is_initialized():
         return
 
+    # Set the device to use for torch.distributed
+    device = xm.xla_device()
+
     comm = MPI.COMM_WORLD
-    backend = "gloo" if not xm.is_available() else "nccl"
+    backend = "gloo" if not xm.is_available() else "xla"
 
     if backend == "gloo":
         hostname = "localhost"
     else:
         hostname = socket.gethostbyname(socket.getfqdn())
+    
     os.environ["MASTER_ADDR"] = comm.bcast(hostname, root=0)
     os.environ["RANK"] = str(comm.rank)
     os.environ["WORLD_SIZE"] = str(comm.size)
 
     port = comm.bcast(_find_free_port(), root=0)
     os.environ["MASTER_PORT"] = str(port)
+
+    # Initialize the process group using the environment variables
     dist.init_process_group(backend=backend, init_method="env://")
 
 
