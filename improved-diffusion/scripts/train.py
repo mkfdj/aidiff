@@ -86,7 +86,10 @@ def main():
             args.experiment = 'random'
             print('loading from the vocabs here.')
 
-        assert args.in_channel == 64
+        # Debugging output
+        print(f"Value of in_channel: {args.in_channel}")  # Debugging line
+        assert args.in_channel == 64, f"Expected in_channel to be 64 but got {args.in_channel}"
+
         assert args.modality == 'roc'
         
         model22 = torch.nn.Embedding(args.vocab_size, args.in_channel)
@@ -190,7 +193,8 @@ def create_argparser():
          seed=101,
          gradient_clipping=-1.0,
          eval_interval=2000,
-         checkpoint_path='diff_models'
+         checkpoint_path='diff_models',
+         in_channel=64  # Set default value for in_channel
      )
 
     text_defaults = dict(
