@@ -1,21 +1,6 @@
 # coding=utf-8
-# Copyright 2020-present the HuggingFace Inc. team.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-"""
-Utilities for the Trainer and TFTrainer class. Should be independent from PyTorch and TensorFlow.
-"""
 
+""" Utilities for the Trainer and TFTrainer class. Should be independent from PyTorch and TensorFlow. """
 import copy
 import functools
 import gc
@@ -26,66 +11,47 @@ import re
 import threading
 import torch_xla.core.xla_model as xm
 import torch_xla 
-import time
-from typing import Any, Dict, NamedTuple, Optional, Tuple, Union
-
-import numpy as np
-
-from .file_utils import (
-    ExplicitEnum,
-    is_psutil_available,
-    is_sagemaker_dp_enabled,
-    is_tf_available,
-    is_torch_available,
-    is_torch_cuda_available,
-    is_torch_tpu_available,
+import time 
+from typing import Any, Dict, NamedTuple, Optional, Tuple, Union 
+import numpy as np 
+from .file_utils import ( 
+   ExplicitEnum, is_psutil_available, is_sagemaker_dp_enabled, is_tf_available, is_torch_available, is_torch_cuda_available, is_torch_tpu_available 
 )
 
+if is_torch_available(): 
+   import torch 
+   import torch_xla.core.xla_model as xm 
 
-if is_torch_available():
-    import torch
-    import torch_xla.core.xla_model as xm
-    import torch_xla 
+if is_tf_available(): 
+   import tensorflow as tf 
 
-if is_tf_available():
-    import tensorflow as tf
+def set_seed(seed: int): 
+   """ Helper function for reproducible behavior to set the seed in `random`, `numpy`, `torch`, and/or `tf` (if installed). Args: seed (`int`): The seed to set. """ 
+   random.seed(seed) 
+   np.random.seed(seed) 
 
+   if is_torch_available(): 
+       torch.manual_seed(seed) 
 
-def set_seed(seed: int):
-    """ Helper function for reproducible behavior to set the seed in `random`, `numpy`, `torch`, and/or `tf`. """
-    random.seed(seed)
-    np.random.seed(seed)
-    
-    if is_torch_available():
-       torch.manual_seed(seed)
-       
-   xm.set_rng_state(seed)  # Set RNG state for XLA devices
+   xm.set_rng_state(seed)  # Safe to call this function even if CUDA is not available 
 
-class EvalPrediction(NamedTuple):
-    """
-    Evaluation output (always contains labels), to be used to compute metrics.
+   if is_tf_available(): 
+       tf.random.set_seed(seed) 
 
-    Parameters:
-        predictions (`np.ndarray`): Predictions of the model.
-        label_ids (`np.ndarray`): Targets to be matched.
-    """
+class EvalPrediction(NamedTuple): 
+   """ Evaluation output (always contains labels), to be used to compute metrics. Parameters: predictions (`np.ndarray`): Predictions of the model. label_ids (`np.ndarray`): Targets to be matched. """ 
+   predictions: Union[np.ndarray, Tuple[np.ndarray]] 
+   label_ids: Union[np.ndarray, Tuple[np.ndarray]] 
 
-    predictions: Union[np.ndarray, Tuple[np.ndarray]]
-    label_ids: Union[np.ndarray, Tuple[np.ndarray]]
+class EvalLoopOutput(NamedTuple): 
+   predictions: Union[np.ndarray, Tuple[np.ndarray]] 
+   label_ids: Optional[Union[np.ndarray, Tuple[np.ndarray]]] 
+   metrics: Optional[Dict[str, float]] 
+   num_samples: Optional[int] 
 
-
-class EvalLoopOutput(NamedTuple):
-    predictions: Union[np.ndarray, Tuple[np.ndarray]]
-    label_ids: Optional[Union[np.ndarray, Tuple[np.ndarray]]]
-    metrics: Optional[Dict[str, float]]
-    num_samples: Optional[int]
-
-
-class PredictionOutput(NamedTuple):
-    predictions: Union[np.ndarray, Tuple[np.ndarray]]
-    label_ids: Optional[Union[np.ndarray, Tuple[np.ndarray]]]
-    metrics: Optional[Dict[str, float]]
-
+class PredictionOutput(NamedTuple): 
+   predictions: Union[np.ndarray, Tuple[np.ndarray]] 
+   label_ids: Optional[Union[np.ndarray, Tuple[np.ndarray]]] 
 
 class TrainOutput(NamedTuple):
     global_step: int

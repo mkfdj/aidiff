@@ -1,12 +1,10 @@
-"""
-Train a diffusion model on images.
-"""
-
+""" Train a diffusion model on images. """
 import argparse
-import json, torch, os
+import json
+import torch
+import os
 import numpy as np
 import torch_xla.core.xla_model as xm
-import torch_xla
 from improved_diffusion import dist_util, logger
 from improved_diffusion.image_datasets import load_data
 from improved_diffusion.text_datasets import load_data_text
@@ -60,7 +58,7 @@ def main():
     if args.experiment_mode == 'conditional_gen':
         assert args.modality in ['e2e']
         assert args.padding_mode == 'pad'
-
+    
     logger.log("creating data loader...")
     
     if args.modality == 'image':
@@ -91,7 +89,6 @@ def main():
         assert args.in_channel == 64
         assert args.modality == 'roc'
         
-        # Load embedding model for ROC modality
         model22 = torch.nn.Embedding(args.vocab_size, args.in_channel)
         model22_weight = torch.load('predictability/diffusion_models_v7/diff_roc-aug_pad_rand64_' 
                                      'transformer_lr0.0001_0.0_2000_sqrt_Lsimple_h128_s2_d0.1_sd108_xstart_e2e/' 
@@ -135,15 +132,13 @@ def main():
         load_vocab=rev_tokenizer,
         model=model2,
     )
-    # dist.barrier()
-    # import time
-    # while not os.path.exists(os.path.join(args.checkpoint_path, 'vocab.json')):
-    #     time.sleep(1)
-def get_mapping_func(args, diffusion, data):
+
+    def get_mapping_func(args, diffusion, data):
         model2, tokenizer = load_models(args.modality, args.experiment, 
                                         args.model_name_or_path, 
                                         args.in_channel, 
                                         args.checkpoint_path, extra_args=args)
+        
         model3 = get_weights(model2, args)
         
         mapping_func = partial(compute_logp, args, model3.to(xm.xla_device()))  # Ensure model is on TPU
@@ -151,11 +146,11 @@ def get_mapping_func(args, diffusion, data):
         
         return mapping_func
 
-get_mapping_func(args, diffusion, data)
+    get_mapping_func(args, diffusion, data)
 
-logger.log("training...")
+    logger.log("training...")
     
-TrainLoop(
+    TrainLoop(
         model=model,
         diffusion=diffusion,
         data=data,
@@ -176,7 +171,6 @@ TrainLoop(
         eval_data=data_valid,
         eval_interval=args.eval_interval
     ).run_loop()
-
 
 def create_argparser():
     defaults = dict(
