@@ -22,16 +22,19 @@ from typing import Optional, Tuple
 
 import torch
 import torch.utils.checkpoint
+import torch_xla.core.xla_model as xm
 from packaging import version
 from torch import nn
 from torch.nn import BCEWithLogitsLoss, CrossEntropyLoss, MSELoss
 
-
 if version.parse(torch.__version__) >= version.parse("1.6"):
-    is_amp_available = True
-    from torch.to(xm.xla_device()).amp import autocast
-else:
-    is_amp_available = False
+    _is_torch_generator_available = True
+    _is_native_amp_available = True
+    try:
+        from torch.cuda.amp import autocast  # For GPU
+    except ImportError:
+        from torch_xla.core.xla_model import autocast  # For TPU
+
 
 from ...activations import ACT2FN
 from ...file_utils import (
