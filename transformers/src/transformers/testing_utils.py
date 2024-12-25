@@ -21,6 +21,8 @@ import shutil
 import sys
 import tempfile
 import unittest
+import torch
+import torch_xla.core.xla_model as xm
 from distutils.util import strtobool
 from io import StringIO
 from pathlib import Path
@@ -494,9 +496,8 @@ def require_torch_tpu(test_case):
 
 if is_torch_available():
     # Set env var CUDA_VISIBLE_DEVICES="" to force cpu-mode
-    import torch
 
-    torch_device = "cuda" if torch.to(xm.xla_device()).is_available() else "cpu"
+    torch_device = "xla" if torch.to(xm.xla_device()).is_available() else "cpu"
 else:
     torch_device = None
 
