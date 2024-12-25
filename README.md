@@ -1,4 +1,4 @@
-# Diffusion-LM Improves Controllable Text Generation
+# Diffusion-LM Improves Controllable Text Generation for TPU only TPU
 
 https://arxiv.org/pdf/2205.14217.pdf 
 
