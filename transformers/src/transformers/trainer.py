@@ -27,6 +27,7 @@ import shutil
 import sys
 import time
 import warnings
+import torch_xla.core.xla_model as xm
 from collections.abc import Mapping
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Union
