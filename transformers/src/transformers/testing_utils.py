@@ -497,7 +497,7 @@ def require_torch_tpu(test_case):
 if is_torch_available():
     # Set env var CUDA_VISIBLE_DEVICES="" to force cpu-mode
 
-    torch_device = "xla" if torch.to(xm.xla_device()).is_available() else "cpu"
+if xm.xla_device().is_available() else 'cpu'
 else:
     torch_device = None
 
