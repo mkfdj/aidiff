@@ -29,6 +29,8 @@ import sys
 import tarfile
 import tempfile
 import types
+import torch
+import torch_xla.core.xla_model as xm
 from collections import OrderedDict, UserDict
 from contextlib import ExitStack, contextmanager
 from dataclasses import fields
