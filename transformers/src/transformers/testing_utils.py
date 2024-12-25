@@ -496,10 +496,12 @@ def require_torch_tpu(test_case):
 
 if is_torch_available():
     # Set env var CUDA_VISIBLE_DEVICES="" to force cpu-mode
-
-if xm.xla_device().is_available() else 'cpu'
+    torch_device = 'cpu'
+elif xm.xla_device().is_available():
+    torch_device = 'xla'
 else:
     torch_device = None
+
 
 if is_tf_available():
     import tensorflow as tf
