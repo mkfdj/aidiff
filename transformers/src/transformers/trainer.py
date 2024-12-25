@@ -149,10 +149,14 @@ if is_in_notebook():
 if is_apex_available():
     from apex import amp
 
+
 if version.parse(torch.__version__) >= version.parse("1.6"):
     _is_torch_generator_available = True
     _is_native_amp_available = True
-    from torch.to(xm.xla_device()).amp import autocast
+    try:
+        from torch.cuda.amp import autocast  # For GPU
+    except ImportError:
+        from torch_xla.core.xla_model import autocast  # For TPU
 
 if is_datasets_available():
     import datasets
