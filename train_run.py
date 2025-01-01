@@ -94,7 +94,7 @@ if __name__ == '__main__':
             --overwrite_output_dir  \
             --logging_dir {logging_dir} \
             --block_size {args.block_size}  \
-            --disable_tqdm True --model_type {args.model_type} \
+            --no_cuda --disable_tqdm True --model_type {args.model_type} \
             --gradient_accumulation_steps {args.gradient_accumulation_steps} " \
                   f"--experiment {args.experiment} --seed {args.seed}"
 
