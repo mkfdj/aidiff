@@ -80,7 +80,7 @@ if __name__ == '__main__':
 
 
 
-    COMMANDLINE = f"python transformers/examples/pytorch/language-modeling/run_clm.py \
+    COMMANDLINE = f"export XRT_TPU_CONFIG=tpu_worker; python transformers/examples/pytorch/language-modeling/run_clm.py \
             --output_dir={Model_FILE} \
             --model_name_or_path={args.pretrained_model} \
             --tokenizer_name={args.pretrained_model} \
