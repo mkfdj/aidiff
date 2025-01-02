@@ -536,8 +536,8 @@ except Exception as e:
     logger.warning(f"TPU initialization failed: {e}, using CPU instead.")
 
     
-    training_args.device = torch.device("cpu")
-    logger.warning("Forcing CPU usage to avoid TPU initialization errors.")
+   # training_args.device = torch.device("cpu")
+   # logger.warning("Forcing CPU usage to avoid TPU initialization errors.")
 
     # Set seed before initializing model.
     set_seed(training_args.seed)
