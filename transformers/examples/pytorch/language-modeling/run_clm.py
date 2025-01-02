@@ -28,12 +28,12 @@ import sys
 from dataclasses import dataclass, field
 from itertools import chain
 from typing import Optional
+import torch
 import datasets
 import stanza
+import torch_xla.core.xla_model as xm
 import spacy_stanza
 from datasets import load_dataset, load_metric
-import torch
-import torch_xla.core.xla_model as xm
 
 import transformers
 from transformers import (
@@ -499,7 +499,6 @@ def get_corpus_rocstory(data_args):
 
 
 def main():
-    import torch
     # See all possible arguments in src/transformers/training_args.py
     # or by passing the --help flag to this script.
     # We now keep distinct sets of args, for a cleaner separation of concerns.
@@ -525,16 +524,19 @@ def main():
     transformers.utils.logging.enable_default_handler()
     transformers.utils.logging.enable_explicit_format()
 
-try:
-    if not torch.xla.device().is_available():
+    if not torch.to(xm.xla_device()).is_available():
         training_args.device = torch.device("cpu")
         logger.warning("TPU not available, using CPU instead.")
     else:
-        xm.set_rng_state(training_args.seed)
-        logger.info(f"TPU available, local ordinal: {xm.get_local_ordinal()}")
-except Exception as e:
+        try:
+            xm.set_rng_state(training_args.seed)
+            logger.info(f"TPU available, local ordinal: {xm.get_local_ordinal()}")
+        except Exception as e:
+            training_args.device = torch.device("cpu")
+            logger.warning(f"TPU initialization failed: {e}, using CPU instead.")
+    
     training_args.device = torch.device("cpu")
-    logger.warning(f"TPU initialization failed: {e}, using CPU instead.")
+    logger.warning("Forcing CPU usage to avoid TPU initialization errors.")
 
     # Set seed before initializing model.
     set_seed(training_args.seed)
@@ -630,6 +632,7 @@ except Exception as e:
                                                 'right_text':train_dataset[1],
                                                 'mid_text':train_dataset[2],
                                                 'label':train_dataset[3]})
+        else:
             train_datasets = Dataset.from_dict({'text': train_dataset})
         raw_datasets = train_datasets.train_test_split(0.01)
         print(raw_datasets)
