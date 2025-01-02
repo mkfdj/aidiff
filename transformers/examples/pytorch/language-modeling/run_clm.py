@@ -549,11 +549,18 @@ def main():
 
     # Set seed before initializing model.
     set_seed(training_args.seed)
-    
+
     if not torch.to(xm.xla_device()).is_available():
         training_args.device = torch.device("cpu")
         logger.warning("TPU not available, using CPU instead.")
-    
+    else:
+        try:
+            xm.set_rng_state(training_args.seed)
+            logger.info(f"TPU available, local ordinal: {xm.get_local_ordinal()}")
+        except Exception as e:
+            training_args.device = torch.device("cpu")
+            logger.warning(f"TPU initialization failed: {e}, using CPU instead.")
+
     # Get the datasets: you can either provide your own CSV/JSON/TXT training and evaluation files (see below)
     # or just provide the name of one of the public datasets available on the hub at https://huggingface.co/datasets/
     # (the dataset will be downloaded automatically from the datasets Hub).
