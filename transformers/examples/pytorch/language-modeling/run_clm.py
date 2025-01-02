@@ -524,9 +524,6 @@ def main():
     transformers.utils.logging.enable_default_handler()
     transformers.utils.logging.enable_explicit_format()
 
-    # Set seed before initializing model.
-    set_seed(training_args.seed)
-
     if not torch.to(xm.xla_device()).is_available():
         training_args.device = torch.device("cpu")
         logger.warning("TPU not available, using CPU instead.")
@@ -540,6 +537,9 @@ def main():
     
     training_args.device = torch.device("cpu")
     logger.warning("Forcing CPU usage to avoid TPU initialization errors.")
+
+    # Set seed before initializing model.
+    set_seed(training_args.seed)
 
     # Log on each process the small summary:
     logger.warning(
