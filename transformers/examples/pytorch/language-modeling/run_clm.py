@@ -525,19 +525,16 @@ def main():
     transformers.utils.logging.enable_default_handler()
     transformers.utils.logging.enable_explicit_format()
 
-    if not torch.to(xm.xla_device()).is_available():
+try:
+    if not torch.xla.device().is_available():
         training_args.device = torch.device("cpu")
         logger.warning("TPU not available, using CPU instead.")
     else:
-        try:
-            xm.set_rng_state(training_args.seed)
-            logger.info(f"TPU available, local ordinal: {xm.get_local_ordinal()}")
-        except Exception as e:
-            training_args.device = torch.device("cpu")
-            logger.warning(f"TPU initialization failed: {e}, using CPU instead.")
-    
+        xm.set_rng_state(training_args.seed)
+        logger.info(f"TPU available, local ordinal: {xm.get_local_ordinal()}")
+except Exception as e:
     training_args.device = torch.device("cpu")
-    logger.warning("Forcing CPU usage to avoid TPU initialization errors.")
+    logger.warning(f"TPU initialization failed: {e}, using CPU instead.")
 
     # Set seed before initializing model.
     set_seed(training_args.seed)
