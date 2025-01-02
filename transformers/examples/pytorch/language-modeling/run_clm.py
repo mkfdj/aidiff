@@ -28,7 +28,6 @@ import sys
 from dataclasses import dataclass, field
 from itertools import chain
 from typing import Optional
-import torch
 import datasets
 import stanza
 import torch_xla.core.xla_model as xm
