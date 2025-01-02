@@ -518,12 +518,28 @@ def main():
         handlers=[logging.StreamHandler(sys.stdout)],
     )
 
-    log_level = training_args.get_process_log_level()
-    logger.setLevel(log_level)
-    datasets.utils.logging.set_verbosity(log_level)
-    transformers.utils.logging.set_verbosity(log_level)
+    logger.setLevel(logging.INFO)
+    datasets.utils.logging.set_verbosity(logging.INFO)
+    transformers.utils.logging.set_verbosity(logging.INFO)
     transformers.utils.logging.enable_default_handler()
     transformers.utils.logging.enable_explicit_format()
+
+    # Set seed before initializing model.
+    set_seed(training_args.seed)
+
+    if not torch.to(xm.xla_device()).is_available():
+        training_args.device = torch.device("cpu")
+        logger.warning("TPU not available, using CPU instead.")
+    else:
+        try:
+            xm.set_rng_state(training_args.seed)
+            logger.info(f"TPU available, local ordinal: {xm.get_local_ordinal()}")
+        except Exception as e:
+            training_args.device = torch.device("cpu")
+            logger.warning(f"TPU initialization failed: {e}, using CPU instead.")
+    
+    training_args.device = torch.device("cpu")
+    logger.warning("Forcing CPU usage to avoid TPU initialization errors.")
 
     # Log on each process the small summary:
     logger.warning(
@@ -546,20 +562,6 @@ def main():
                 f"Checkpoint detected, resuming training at {last_checkpoint}. To avoid this behavior, change "
                 "the `--output_dir` or add `--overwrite_output_dir` to train from scratch."
             )
-
-    # Set seed before initializing model.
-    set_seed(training_args.seed)
-
-    if not torch.to(xm.xla_device()).is_available():
-        training_args.device = torch.device("cpu")
-        logger.warning("TPU not available, using CPU instead.")
-    else:
-        try:
-            xm.set_rng_state(training_args.seed)
-            logger.info(f"TPU available, local ordinal: {xm.get_local_ordinal()}")
-        except Exception as e:
-            training_args.device = torch.device("cpu")
-            logger.warning(f"TPU initialization failed: {e}, using CPU instead.")
 
     # Get the datasets: you can either provide your own CSV/JSON/TXT training and evaluation files (see below)
     # or just provide the name of one of the public datasets available on the hub at https://huggingface.co/datasets/
