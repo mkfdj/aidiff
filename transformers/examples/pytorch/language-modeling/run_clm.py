@@ -552,6 +552,7 @@ def main():
     
     if xm.xla_device() is not None:
         global torch
+        global torch_xla 
         training_args.device = torch.device("xla")
         logger.warning("TPU was successfully detected. Using TPU")
     else:
