@@ -236,6 +236,3 @@ class XLMOnnxConfig(OnnxConfig):
                 ("token_type_ids", dynamic_axis),
             ]
         )
-
-
-__all__ = ["XLMConfig", "XLMOnnxConfig"]

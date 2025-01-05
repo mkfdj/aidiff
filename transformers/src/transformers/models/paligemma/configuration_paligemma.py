@@ -145,6 +145,3 @@ class PaliGemmaConfig(PretrainedConfig):
         output = super().to_dict()
         output.pop("_ignore_index", None)
         return output
-
-
-__all__ = ["PaliGemmaConfig"]

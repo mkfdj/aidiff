@@ -206,6 +206,3 @@ class FalconConfig(PretrainedConfig):
     @property
     def rotary(self):
         return not self.alibi
-
-
-__all__ = ["FalconConfig"]

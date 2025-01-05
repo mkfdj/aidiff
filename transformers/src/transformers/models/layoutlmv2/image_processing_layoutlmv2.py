@@ -296,6 +296,3 @@ class LayoutLMv2ImageProcessor(BaseImageProcessor):
             data["words"] = words_batch
             data["boxes"] = boxes_batch
         return data
-
-
-__all__ = ["LayoutLMv2ImageProcessor"]

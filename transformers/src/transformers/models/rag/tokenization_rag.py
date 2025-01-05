@@ -119,6 +119,3 @@ class RagTokenizer:
         )
         model_inputs["labels"] = labels["input_ids"]
         return model_inputs
-
-
-__all__ = ["RagTokenizer"]

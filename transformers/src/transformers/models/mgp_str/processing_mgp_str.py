@@ -228,6 +228,3 @@ class MgpstrProcessor(ProcessorMixin):
         """
         decode_strs = [seq.replace(" ", "") for seq in self.wp_tokenizer.batch_decode(sequences)]
         return decode_strs
-
-
-__all__ = ["MgpstrProcessor"]

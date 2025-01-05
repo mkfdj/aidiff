@@ -222,6 +222,3 @@ class OwlViTProcessor(ProcessorMixin):
             FutureWarning,
         )
         return self.image_processor
-
-
-__all__ = ["OwlViTProcessor"]

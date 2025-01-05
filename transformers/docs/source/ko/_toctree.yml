@@ -152,8 +152,6 @@
   - local: in_translation
     title: (번역중) AQLM
   - local: in_translation
-    title: (번역중) VPTQ 
-  - local: in_translation
     title: (번역중) Quanto
   - local: in_translation
     title: (번역중) EETQ
@@ -175,8 +173,6 @@
     title: (번역중) AWQ
   - local: in_translation
     title: (번역중) AQLM
-  - local: in_translation
-    title: (번역중) VPTQ
   - local: quantization/quanto
     title: Quanto
   - local: quantization/eetq

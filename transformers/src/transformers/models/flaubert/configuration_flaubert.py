@@ -230,6 +230,3 @@ class FlaubertOnnxConfig(OnnxConfig):
                 ("attention_mask", dynamic_axis),
             ]
         )
-
-
-__all__ = ["FlaubertConfig", "FlaubertOnnxConfig"]

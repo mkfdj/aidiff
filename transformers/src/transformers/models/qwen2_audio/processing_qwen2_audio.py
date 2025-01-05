@@ -175,6 +175,3 @@ class Qwen2AudioProcessor(ProcessorMixin):
             "{% endif %}"
         )
         # fmt: on
-
-
-__all__ = ["Qwen2AudioProcessor"]

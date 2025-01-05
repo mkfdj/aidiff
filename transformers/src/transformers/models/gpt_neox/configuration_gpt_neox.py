@@ -189,6 +189,3 @@ class GPTNeoXConfig(PretrainedConfig):
             raise ValueError(
                 "The hidden size is not divisble by the number of attention heads! Make sure to update them!"
             )
-
-
-__all__ = ["GPTNeoXConfig"]

@@ -859,6 +859,3 @@ class FlaxVisionEncoderDecoderModel(FlaxPreTrainedModel):
         model.params["decoder"] = decoder.params
 
         return model
-
-
-__all__ = ["FlaxVisionEncoderDecoderModel"]

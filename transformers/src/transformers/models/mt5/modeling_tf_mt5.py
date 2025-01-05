@@ -93,6 +93,3 @@ class TFMT5EncoderModel(TFT5EncoderModel):
 
     model_type = "mt5"
     config_class = MT5Config
-
-
-__all__ = ["TFMT5EncoderModel", "TFMT5ForConditionalGeneration", "TFMT5Model"]

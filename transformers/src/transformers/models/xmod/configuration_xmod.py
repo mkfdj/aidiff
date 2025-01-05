@@ -180,6 +180,3 @@ class XmodOnnxConfig(OnnxConfig):
                 ("attention_mask", dynamic_axis),
             ]
         )
-
-
-__all__ = ["XmodConfig", "XmodOnnxConfig"]

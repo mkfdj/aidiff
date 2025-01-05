@@ -169,18 +169,40 @@ class Qwen2MoeRMSNorm(nn.Module):
 class Qwen2MoeRotaryEmbedding(nn.Module):
     def __init__(
         self,
-        config: Qwen2MoeConfig,
+        dim=None,
+        max_position_embeddings=2048,
+        base=10000,
         device=None,
+        scaling_factor=1.0,
+        rope_type="default",
+        config: Optional[Qwen2MoeConfig] = None,
     ):
         super().__init__()
+        # TODO (joao): remove the `if` below, only used for BC
         self.rope_kwargs = {}
-        # BC: "rope_type" was originally "type"
-        if hasattr(config, "rope_scaling") and config.rope_scaling is not None:
-            self.rope_type = config.rope_scaling.get("rope_type", config.rope_scaling.get("type"))
+        if config is None:
+            logger.warning_once(
+                "`Qwen2MoeRotaryEmbedding` can now be fully parameterized by passing the model config through the "
+                "`config` argument. All other arguments will be removed in v4.46"
+            )
+            self.rope_kwargs = {
+                "rope_type": rope_type,
+                "factor": scaling_factor,
+                "dim": dim,
+                "base": base,
+                "max_position_embeddings": max_position_embeddings,
+            }
+            self.rope_type = rope_type
+            self.max_seq_len_cached = max_position_embeddings
+            self.original_max_seq_len = max_position_embeddings
         else:
-            self.rope_type = "default"
-        self.max_seq_len_cached = config.max_position_embeddings
-        self.original_max_seq_len = config.max_position_embeddings
+            # BC: "rope_type" was originally "type"
+            if config.rope_scaling is not None:
+                self.rope_type = config.rope_scaling.get("rope_type", config.rope_scaling.get("type"))
+            else:
+                self.rope_type = "default"
+            self.max_seq_len_cached = config.max_position_embeddings
+            self.original_max_seq_len = config.max_position_embeddings
 
         self.config = config
         self.rope_init_fn = ROPE_INIT_FUNCTIONS[self.rope_type]
@@ -296,8 +318,7 @@ def repeat_kv(hidden_states: torch.Tensor, n_rep: int) -> torch.Tensor:
     return hidden_states.reshape(batch, num_key_value_heads * n_rep, slen, head_dim)
 
 
-# copied from transformers.models.qwen2.modeling_qwen2.Qwen2Attention with Qwen2->Qwen2Moe
-# no longer copied after attention refactors
+# Copied from transformers.models.qwen2.modeling_qwen2.Qwen2Attention with Qwen2->Qwen2Moe
 class Qwen2MoeAttention(nn.Module):
     """
     Multi-headed attention from 'Attention Is All You Need' paper. Modified to use sliding window attention: Longformer
@@ -347,7 +368,7 @@ class Qwen2MoeAttention(nn.Module):
         output_attentions: bool = False,
         use_cache: bool = False,
         cache_position: Optional[torch.LongTensor] = None,
-        position_embeddings: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,  # necessary, but kept here for BC
+        position_embeddings: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,  # will become mandatory in v4.46
     ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
         bsz, q_len, _ = hidden_states.size()
 
@@ -359,7 +380,17 @@ class Qwen2MoeAttention(nn.Module):
         key_states = key_states.view(bsz, q_len, -1, self.head_dim).transpose(1, 2)
         value_states = value_states.view(bsz, q_len, -1, self.head_dim).transpose(1, 2)
 
-        cos, sin = position_embeddings
+        if position_embeddings is None:
+            logger.warning_once(
+                "The attention layers in this model are transitioning from computing the RoPE embeddings internally "
+                "through `position_ids` (2D tensor with the indexes of the tokens), to using externally computed "
+                "`position_embeddings` (Tuple of tensors, containing cos and sin). In v4.46 `position_ids` will be "
+                "removed and `position_embeddings` will be mandatory."
+            )
+            cos, sin = self.rotary_emb(value_states, position_ids)
+        else:
+            cos, sin = position_embeddings
+
         query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin, position_ids)
 
         if past_key_value is not None:
@@ -398,8 +429,7 @@ class Qwen2MoeAttention(nn.Module):
         return attn_output, attn_weights, past_key_value
 
 
-# NO LONGER EXIST Copied from transformers.models.qwen2.modeling_qwen2.Qwen2FlashAttention2 with Qwen2->Qwen2Moe
-# TODO cyril: modular
+# Copied from transformers.models.qwen2.modeling_qwen2.Qwen2FlashAttention2 with Qwen2->Qwen2Moe
 class Qwen2MoeFlashAttention2(Qwen2MoeAttention):
     """
     Qwen2Moe flash attention module, following Qwen2Moe attention module. This module inherits from `Qwen2MoeAttention`
@@ -409,6 +439,7 @@ class Qwen2MoeFlashAttention2(Qwen2MoeAttention):
     config.max_window_layers layers.
     """
 
+    # Copied from transformers.models.llama.modeling_llama.LlamaFlashAttention2.__init__
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -426,7 +457,7 @@ class Qwen2MoeFlashAttention2(Qwen2MoeAttention):
         output_attentions: bool = False,
         use_cache: bool = False,
         cache_position: Optional[torch.LongTensor] = None,
-        position_embeddings: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,  # necessary, but kept here for BC
+        position_embeddings: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,  # will become mandatory in v4.46
     ):
         bsz, q_len, _ = hidden_states.size()
 
@@ -438,7 +469,16 @@ class Qwen2MoeFlashAttention2(Qwen2MoeAttention):
         key_states = key_states.view(bsz, q_len, -1, self.head_dim).transpose(1, 2)
         value_states = value_states.view(bsz, q_len, -1, self.head_dim).transpose(1, 2)
 
-        cos, sin = position_embeddings
+        if position_embeddings is None:
+            logger.warning_once(
+                "The attention layers in this model are transitioning from computing the RoPE embeddings internally "
+                "through `position_ids` (2D tensor with the indexes of the tokens), to using externally computed "
+                "`position_embeddings` (Tuple of tensors, containing cos and sin). In v4.46 `position_ids` will be "
+                "removed and `position_embeddings` will be mandatory."
+            )
+            cos, sin = self.rotary_emb(value_states, position_ids)
+        else:
+            cos, sin = position_embeddings
         query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin)
 
         if past_key_value is not None:
@@ -509,8 +549,7 @@ class Qwen2MoeFlashAttention2(Qwen2MoeAttention):
         return attn_output, attn_weights, past_key_value
 
 
-# NO LONGER EXIST Copied from transformers.models.qwen2.modeling_qwen2.Qwen2SdpaAttention with Qwen2->Qwen2Moe
-# TODO cyril: modular
+# Copied from transformers.models.qwen2.modeling_qwen2.Qwen2SdpaAttention with Qwen2->Qwen2Moe
 class Qwen2MoeSdpaAttention(Qwen2MoeAttention):
     """
     Qwen2Moe attention module using torch.nn.functional.scaled_dot_product_attention. This module inherits from
@@ -528,7 +567,7 @@ class Qwen2MoeSdpaAttention(Qwen2MoeAttention):
         output_attentions: bool = False,
         use_cache: bool = False,
         cache_position: Optional[torch.LongTensor] = None,
-        position_embeddings: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,  # necessary, but kept here for BC
+        position_embeddings: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,  # will become mandatory in v4.46
     ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
         if output_attentions:
             # TODO: Improve this warning with e.g. `model.config.attn_implementation = "manual"` once this is implemented.
@@ -543,8 +582,6 @@ class Qwen2MoeSdpaAttention(Qwen2MoeAttention):
                 past_key_value=past_key_value,
                 output_attentions=output_attentions,
                 use_cache=use_cache,
-                cache_position=cache_position,
-                position_embeddings=position_embeddings,
             )
 
         bsz, q_len, _ = hidden_states.size()
@@ -557,7 +594,16 @@ class Qwen2MoeSdpaAttention(Qwen2MoeAttention):
         key_states = key_states.view(bsz, q_len, -1, self.head_dim).transpose(1, 2)
         value_states = value_states.view(bsz, q_len, -1, self.head_dim).transpose(1, 2)
 
-        cos, sin = position_embeddings
+        if position_embeddings is None:
+            logger.warning_once(
+                "The attention layers in this model are transitioning from computing the RoPE embeddings internally "
+                "through `position_ids` (2D tensor with the indexes of the tokens), to using externally computed "
+                "`position_embeddings` (Tuple of tensors, containing cos and sin). In v4.46 `position_ids` will be "
+                "removed and `position_embeddings` will be mandatory."
+            )
+            cos, sin = self.rotary_emb(value_states, position_ids)
+        else:
+            cos, sin = position_embeddings
         query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin)
 
         if past_key_value is not None:
@@ -696,7 +742,7 @@ class Qwen2MoeDecoderLayer(nn.Module):
         output_router_logits: Optional[bool] = False,
         use_cache: Optional[bool] = False,
         cache_position: Optional[torch.LongTensor] = None,
-        position_embeddings: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,  # necessary, but kept here for BC
+        position_embeddings: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,  # will become mandatory in v4.46
         **kwargs,
     ) -> Tuple[torch.FloatTensor, Optional[Tuple[torch.FloatTensor, torch.FloatTensor]]]:
         """
@@ -1558,10 +1604,11 @@ SQuAD (a linear layer on top of the hidden-states output to compute `span start 
 class Qwen2MoeForQuestionAnswering(Qwen2MoePreTrainedModel):
     base_model_prefix = "model"
 
+    # Copied from models.models.bloom.modeling_bloom.BloomForQuestionAnswering.__init__ with Bloom->Qwen2Moe
     def __init__(self, config):
         super().__init__(config)
+        self.model = Qwen2MoeModel(config)
         self.qa_outputs = nn.Linear(config.hidden_size, 2)
-        self.model = Qwen2MoeModel(config)  # diff with Llama: transformer->model
 
         # Initialize weights and apply final processing
         self.post_init()
@@ -1632,13 +1679,3 @@ class Qwen2MoeForQuestionAnswering(Qwen2MoePreTrainedModel):
             hidden_states=outputs.hidden_states,
             attentions=outputs.attentions,
         )
-
-
-__all__ = [
-    "Qwen2MoeForCausalLM",
-    "Qwen2MoeForQuestionAnswering",
-    "Qwen2MoeModel",
-    "Qwen2MoePreTrainedModel",
-    "Qwen2MoeForSequenceClassification",
-    "Qwen2MoeForTokenClassification",
-]

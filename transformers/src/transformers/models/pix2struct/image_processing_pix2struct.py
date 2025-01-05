@@ -459,6 +459,3 @@ class Pix2StructImageProcessor(BaseImageProcessor):
         )
 
         return encoded_outputs
-
-
-__all__ = ["Pix2StructImageProcessor"]

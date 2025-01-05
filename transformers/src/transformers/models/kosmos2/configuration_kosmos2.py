@@ -259,6 +259,3 @@ class Kosmos2Config(PretrainedConfig):
         self.vision_config = Kosmos2VisionConfig(**vision_config)
 
         self.latent_query_num = latent_query_num
-
-
-__all__ = ["Kosmos2Config"]

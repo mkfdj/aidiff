@@ -213,6 +213,3 @@ class FSMTConfig(PretrainedConfig):
             early_stopping=early_stopping,
             **common_kwargs,
         )
-
-
-__all__ = ["FSMTConfig"]

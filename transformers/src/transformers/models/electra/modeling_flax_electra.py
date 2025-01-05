@@ -1599,16 +1599,3 @@ append_call_sample_docstring(
     FlaxCausalLMOutputWithCrossAttentions,
     _CONFIG_FOR_DOC,
 )
-
-
-__all__ = [
-    "FlaxElectraForCausalLM",
-    "FlaxElectraForMaskedLM",
-    "FlaxElectraForMultipleChoice",
-    "FlaxElectraForPreTraining",
-    "FlaxElectraForQuestionAnswering",
-    "FlaxElectraForSequenceClassification",
-    "FlaxElectraForTokenClassification",
-    "FlaxElectraModel",
-    "FlaxElectraPreTrainedModel",
-]

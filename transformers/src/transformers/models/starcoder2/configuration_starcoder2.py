@@ -197,6 +197,3 @@ class Starcoder2Config(PretrainedConfig):
             eos_token_id=eos_token_id,
             **kwargs,
         )
-
-
-__all__ = ["Starcoder2Config"]

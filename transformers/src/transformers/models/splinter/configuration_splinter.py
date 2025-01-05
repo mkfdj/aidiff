@@ -118,6 +118,3 @@ class SplinterConfig(PretrainedConfig):
         self.layer_norm_eps = layer_norm_eps
         self.use_cache = use_cache
         self.question_token_id = question_token_id
-
-
-__all__ = ["SplinterConfig"]

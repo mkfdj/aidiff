@@ -139,6 +139,3 @@ class YosoConfig(PretrainedConfig):
         self.conv_window = conv_window
         self.use_fast_hash = use_fast_hash
         self.lsh_backward = lsh_backward
-
-
-__all__ = ["YosoConfig"]

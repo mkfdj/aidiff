@@ -115,6 +115,8 @@ class ChameleonRotaryEmbedding(nn.Module):
         return cos.to(dtype=x.dtype), sin.to(dtype=x.dtype)
 
 
+# copied from transformers.models.llama.modeling_llama.LlamaLinearScalingRotaryEmbedding with Llama->Chameleon
+# TODO(joao): add me back asap :)
 class ChameleonLinearScalingRotaryEmbedding(ChameleonRotaryEmbedding):
     """ChameleonRotaryEmbedding extended with linear scaling. Credits to the Reddit user /u/kaiokendev"""
 
@@ -125,6 +127,8 @@ class ChameleonLinearScalingRotaryEmbedding(ChameleonRotaryEmbedding):
         return cos, sin
 
 
+# copied from transformers.models.llama.modeling_llama.LlamaDynamicNTKScalingRotaryEmbedding with Llama->Chameleon
+# TODO(joao): add me back asap :)
 class ChameleonDynamicNTKScalingRotaryEmbedding(ChameleonRotaryEmbedding):
     """ChameleonRotaryEmbedding extended with Dynamic NTK scaling. Credits to the Reddit users /u/bloc97 and /u/emozilla"""
 
@@ -362,7 +366,7 @@ class ChameleonAttention(nn.Module):
         return attn_output, attn_weights, past_key_value
 
 
-# NO LONGER EXIST copied from transformers.models.llama.modeling_llama.LlamaFlashAttention2 with Llama->Chameleon
+# copied from transformers.models.llama.modeling_llama.LlamaFlashAttention2 with Llama->Chameleon
 # TODO(joao): add me back asap :)
 class ChameleonFlashAttention2(ChameleonAttention):
     """
@@ -1385,7 +1389,7 @@ class ChameleonModel(ChameleonPreTrainedModel):
         output_attentions: bool,
     ):
         if self.config._attn_implementation == "flash_attention_2":
-            if attention_mask is not None and (attention_mask == 0.0).any():
+            if attention_mask is not None and 0.0 in attention_mask:
                 return attention_mask
             return None
 
@@ -1685,6 +1689,3 @@ class ChameleonForConditionalGeneration(ChameleonPreTrainedModel, GenerationMixi
             }
         )
         return model_inputs
-
-
-__all__ = ["ChameleonForConditionalGeneration", "ChameleonModel", "ChameleonPreTrainedModel", "ChameleonVQVAE"]

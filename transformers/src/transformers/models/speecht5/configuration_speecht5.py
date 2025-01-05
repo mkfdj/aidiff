@@ -417,6 +417,3 @@ class SpeechT5HifiGanConfig(PretrainedConfig):
         self.leaky_relu_slope = leaky_relu_slope
         self.normalize_before = normalize_before
         super().__init__(**kwargs)
-
-
-__all__ = ["SpeechT5Config", "SpeechT5HifiGanConfig"]

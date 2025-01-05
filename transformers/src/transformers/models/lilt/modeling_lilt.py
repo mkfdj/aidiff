@@ -1181,12 +1181,3 @@ class LiltForQuestionAnswering(LiltPreTrainedModel):
             hidden_states=outputs.hidden_states,
             attentions=outputs.attentions,
         )
-
-
-__all__ = [
-    "LiltForQuestionAnswering",
-    "LiltForSequenceClassification",
-    "LiltForTokenClassification",
-    "LiltModel",
-    "LiltPreTrainedModel",
-]

@@ -333,6 +333,3 @@ class LlavaOnevisionVideoProcessor(BaseImageProcessor):
             data={"pixel_values_videos": pixel_values},
             tensor_type=return_tensors,
         )
-
-
-__all__ = ["LlavaOnevisionVideoProcessor"]

@@ -1768,6 +1768,3 @@ class TFRagSequenceForGeneration(TFRagPreTrainedModel, TFCausalLanguageModelingL
         if getattr(self, "rag", None) is not None:
             with tf.name_scope(self.rag.name):
                 self.rag.build(None)
-
-
-__all__ = ["TFRagModel", "TFRagPreTrainedModel", "TFRagSequenceForGeneration", "TFRagTokenForGeneration"]

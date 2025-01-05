@@ -75,6 +75,7 @@ from .optimization import Adafactor, get_scheduler
 from .processing_utils import ProcessorMixin
 from .pytorch_utils import (
     ALL_LAYERNORM_LAYERS,
+    is_torch_greater_or_equal_than_1_13,
     is_torch_greater_or_equal_than_2_3,
 )
 from .tokenization_utils_base import PreTrainedTokenizerBase
@@ -622,15 +623,7 @@ class Trainer:
             else unwrapped_model.get_base_model().forward
         )
         forward_params = inspect.signature(model_forward).parameters
-
-        # Check if the model has explicit setup for loss kwargs,
-        # if not, check if `**kwargs` are in model.forward
-        if hasattr(model, "accepts_loss_kwargs"):
-            self.model_accepts_loss_kwargs = model.accepts_loss_kwargs
-        else:
-            self.model_accepts_loss_kwargs = any(
-                k.kind == inspect.Parameter.VAR_KEYWORD for k in forward_params.values()
-            )
+        self.model_accepts_loss_kwargs = any(k.kind == inspect.Parameter.VAR_KEYWORD for k in forward_params.values())
 
         self.neftune_noise_alpha = args.neftune_noise_alpha
 
@@ -2785,7 +2778,7 @@ class Trainer:
                 )
 
         if os.path.isfile(weights_file) or os.path.isfile(safe_weights_file) or is_fsdp_ckpt:
-            weights_only_kwarg = {"weights_only": True}
+            weights_only_kwarg = {"weights_only": True} if is_torch_greater_or_equal_than_1_13 else {}
             # If the model is on the GPU, it still works!
             if is_sagemaker_mp_enabled():
                 if os.path.isfile(os.path.join(resume_from_checkpoint, "user_content.pt")):
@@ -2906,7 +2899,7 @@ class Trainer:
             or os.path.exists(best_safe_adapter_model_path)
         ):
             has_been_loaded = True
-            weights_only_kwarg = {"weights_only": True}
+            weights_only_kwarg = {"weights_only": True} if is_torch_greater_or_equal_than_1_13 else {}
             if is_sagemaker_mp_enabled():
                 if os.path.isfile(os.path.join(self.state.best_model_checkpoint, "user_content.pt")):
                     # If the 'user_content.pt' file exists, load with the new smp api.
@@ -2947,22 +2940,7 @@ class Trainer:
                             active_adapter = model.active_adapter
 
                         if os.path.exists(best_adapter_model_path) or os.path.exists(best_safe_adapter_model_path):
-                            try:
-                                model.load_adapter(self.state.best_model_checkpoint, active_adapter)
-                            except RuntimeError as exc:
-                                if model.peft_config[active_adapter].is_prompt_learning:
-                                    # for context: https://github.com/huggingface/peft/issues/2256
-                                    msg = (
-                                        "When using prompt learning PEFT methods such as "
-                                        f"{model.peft_config[active_adapter].peft_type.value}, setting "
-                                        "load_best_model_at_end=True can lead to errors, it is recommended "
-                                        "to set this to False and to load the model manually from the checkpoint "
-                                        "directory using PeftModel.from_pretrained(base_model, <path>) after training "
-                                        "has finished."
-                                    )
-                                    raise RuntimeError(msg) from exc
-                                else:
-                                    raise
+                            model.load_adapter(self.state.best_model_checkpoint, active_adapter)
                             # Load_adapter has no return value present, modify it when appropriate.
                             from torch.nn.modules.module import _IncompatibleKeys
 
@@ -3706,12 +3684,10 @@ class Trainer:
             with amp.scale_loss(loss, self.optimizer) as scaled_loss:
                 scaled_loss.backward()
         else:
+            self.accelerator.backward(loss, **kwargs)
             # Finally we need to normalize the loss for reporting
             if num_items_in_batch is None:
-                loss = loss / self.args.gradient_accumulation_steps
-
-            self.accelerator.backward(loss, **kwargs)
-
+                return loss.detach() / self.args.gradient_accumulation_steps
             return loss.detach()
 
     def compute_loss(self, model, inputs, return_outputs=False, num_items_in_batch=None):

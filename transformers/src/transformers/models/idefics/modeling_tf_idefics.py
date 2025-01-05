@@ -1810,6 +1810,3 @@ class TFIdeficsForVisionText2Text(TFPreTrainedModel, TFCausalLanguageModelingLos
         if getattr(self, "lm_head", None) is not None:
             with tf.name_scope(self.lm_head.name):
                 self.lm_head.build(None)
-
-
-__all__ = ["TFIdeficsForVisionText2Text", "TFIdeficsModel", "TFIdeficsPreTrainedModel"]

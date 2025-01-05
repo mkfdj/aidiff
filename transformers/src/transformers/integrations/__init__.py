@@ -63,7 +63,6 @@ _import_structure = {
         "load_dequant_gguf_tensor",
         "load_gguf",
     ],
-    "higgs": ["HiggsLinear", "dequantize_higgs", "quantize_with_higgs", "replace_with_higgs_linear"],
     "hqq": ["prepare_for_hqq_linear"],
     "integration_utils": [
         "INTEGRATION_TO_CALLBACK",
@@ -106,7 +105,6 @@ _import_structure = {
     ],
     "peft": ["PeftAdapterMixin"],
     "quanto": ["replace_with_quanto_layers"],
-    "vptq": ["replace_with_vptq_linear"],
 }
 
 try:
@@ -167,7 +165,6 @@ if TYPE_CHECKING:
         load_dequant_gguf_tensor,
         load_gguf,
     )
-    from .higgs import HiggsLinear, dequantize_higgs, quantize_with_higgs, replace_with_higgs_linear
     from .hqq import prepare_for_hqq_linear
     from .integration_utils import (
         INTEGRATION_TO_CALLBACK,
@@ -210,7 +207,6 @@ if TYPE_CHECKING:
     )
     from .peft import PeftAdapterMixin
     from .quanto import replace_with_quanto_layers
-    from .vptq import replace_with_vptq_linear
 
     try:
         if not is_torch_available():

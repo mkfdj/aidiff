@@ -166,6 +166,3 @@ class IdeficsImageProcessor(BaseImageProcessor):
         images = BatchFeature(data={"pixel_values": images}, tensor_type=return_tensors)["pixel_values"]
 
         return images
-
-
-__all__ = ["IdeficsImageProcessor"]

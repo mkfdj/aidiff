@@ -1300,15 +1300,3 @@ class FlaubertForMultipleChoice(FlaubertPreTrainedModel):
             hidden_states=transformer_outputs.hidden_states,
             attentions=transformer_outputs.attentions,
         )
-
-
-__all__ = [
-    "FlaubertForMultipleChoice",
-    "FlaubertForQuestionAnswering",
-    "FlaubertForQuestionAnsweringSimple",
-    "FlaubertForSequenceClassification",
-    "FlaubertForTokenClassification",
-    "FlaubertModel",
-    "FlaubertWithLMHeadModel",
-    "FlaubertPreTrainedModel",
-]

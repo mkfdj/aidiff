@@ -163,6 +163,3 @@ class DepthAnythingConfig(PretrainedConfig):
 
         output["model_type"] = self.__class__.model_type
         return output
-
-
-__all__ = ["DepthAnythingConfig"]

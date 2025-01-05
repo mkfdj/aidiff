@@ -1639,6 +1639,3 @@ class RagTokenForGeneration(RagPreTrainedModel):
         eps_i = epsilon / rag_logprobs.size(-1)
         loss = (1.0 - epsilon) * nll_loss + eps_i * smooth_loss
         return loss
-
-
-__all__ = ["RagModel", "RagPreTrainedModel", "RagSequenceForGeneration", "RagTokenForGeneration"]

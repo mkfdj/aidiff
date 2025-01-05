@@ -596,6 +596,3 @@ overwrite_call_docstring(
 append_replace_return_docstrings(
     FlaxVisionTextDualEncoderModel, output_type=FlaxCLIPOutput, config_class=_CONFIG_FOR_DOC
 )
-
-
-__all__ = ["FlaxVisionTextDualEncoderModel"]

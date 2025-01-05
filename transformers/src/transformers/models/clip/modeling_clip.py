@@ -401,6 +401,7 @@ class CLIPFlashAttention2(CLIPAttention):
     flash attention and deal with padding tokens in case the input contains any of them.
     """
 
+    # Copied from transformers.models.llama.modeling_llama.LlamaFlashAttention2.__init__
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -1676,14 +1677,3 @@ class CLIPForImageClassification(CLIPPreTrainedModel):
             hidden_states=outputs.hidden_states,
             attentions=outputs.attentions,
         )
-
-
-__all__ = [
-    "CLIPModel",
-    "CLIPPreTrainedModel",
-    "CLIPTextModel",
-    "CLIPTextModelWithProjection",
-    "CLIPVisionModel",
-    "CLIPVisionModelWithProjection",
-    "CLIPForImageClassification",
-]

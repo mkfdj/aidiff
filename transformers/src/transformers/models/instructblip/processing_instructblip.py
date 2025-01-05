@@ -218,6 +218,3 @@ class InstructBlipProcessor(ProcessorMixin):
         qformer_tokenizer = AutoTokenizer.from_pretrained(pretrained_model_name_or_path, subfolder="qformer_tokenizer")
         processor.qformer_tokenizer = qformer_tokenizer
         return processor
-
-
-__all__ = ["InstructBlipProcessor"]

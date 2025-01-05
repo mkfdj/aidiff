@@ -1633,11 +1633,3 @@ class InstructBlipForConditionalGeneration(InstructBlipPreTrainedModel, Generati
         outputs = self.language_model.generate(**inputs, **generate_kwargs)
 
         return outputs
-
-
-__all__ = [
-    "InstructBlipQFormerModel",
-    "InstructBlipPreTrainedModel",
-    "InstructBlipForConditionalGeneration",
-    "InstructBlipVisionModel",
-]

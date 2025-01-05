@@ -411,6 +411,3 @@ class SeamlessM4TConfig(PretrainedConfig):
             max_position_embeddings=max_position_embeddings,
             **kwargs,
         )
-
-
-__all__ = ["SeamlessM4TConfig"]

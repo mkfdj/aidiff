@@ -642,6 +642,3 @@ class EfficientNetForImageClassification(EfficientNetPreTrainedModel):
             logits=logits,
             hidden_states=outputs.hidden_states,
         )
-
-
-__all__ = ["EfficientNetForImageClassification", "EfficientNetModel", "EfficientNetPreTrainedModel"]

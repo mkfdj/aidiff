@@ -294,6 +294,3 @@ class GPTSw3Tokenizer(PreTrainedTokenizer):
         """
 
         return self.sp_model.decode(token_ids)
-
-
-__all__ = ["GPTSw3Tokenizer"]

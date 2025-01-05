@@ -445,6 +445,3 @@ class SeamlessM4TTokenizerFast(PreTrainedTokenizerFast):
         )
 
         return output
-
-
-__all__ = ["SeamlessM4TTokenizerFast"]

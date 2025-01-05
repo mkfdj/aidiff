@@ -1271,7 +1271,7 @@ class XGLMConverter(SpmConverter):
         )
 
 
-class GemmaConverter(SpmConverter):
+class GemmaConvert(SpmConverter):
     handle_byte_fallback = True
     SpmExtractor = GemmaSentencePieceExtractor
     # start and end of turn tokens must be marked as special
@@ -1601,7 +1601,7 @@ SLOW_TO_FAST_CONVERTERS = {
     "XGLMTokenizer": XGLMConverter,
     "LlamaTokenizer": LlamaConverter,
     "CodeLlamaTokenizer": LlamaConverter,
-    "GemmaTokenizer": GemmaConverter,
+    "GemmaTokenizer": GemmaConvert,
     "Phi3Tokenizer": LlamaConverter,
 }
 

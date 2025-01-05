@@ -142,6 +142,3 @@ class ViltConfig(PretrainedConfig):
         self.qkv_bias = qkv_bias
         self.max_image_length = max_image_length
         self.num_images = num_images
-
-
-__all__ = ["ViltConfig"]

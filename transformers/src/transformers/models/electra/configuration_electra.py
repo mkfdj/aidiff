@@ -182,6 +182,3 @@ class ElectraOnnxConfig(OnnxConfig):
                 ("token_type_ids", dynamic_axis),
             ]
         )
-
-
-__all__ = ["ElectraConfig", "ElectraOnnxConfig"]

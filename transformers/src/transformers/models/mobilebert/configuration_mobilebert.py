@@ -179,6 +179,3 @@ class MobileBertOnnxConfig(OnnxConfig):
                 ("token_type_ids", dynamic_axis),
             ]
         )
-
-
-__all__ = ["MobileBertConfig", "MobileBertOnnxConfig"]

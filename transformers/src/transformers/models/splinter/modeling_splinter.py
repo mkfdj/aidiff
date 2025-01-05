@@ -1105,12 +1105,3 @@ class SplinterForPreTraining(SplinterPreTrainedModel):
         cols = torch.cat([torch.arange(n) for n in num_questions])
         positions[rows, cols] = flat_positions
         return positions
-
-
-__all__ = [
-    "SplinterForQuestionAnswering",
-    "SplinterForPreTraining",
-    "SplinterLayer",
-    "SplinterModel",
-    "SplinterPreTrainedModel",
-]

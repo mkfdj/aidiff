@@ -355,6 +355,3 @@ class Wav2Vec2ConformerConfig(PretrainedConfig):
     @property
     def inputs_to_logits_ratio(self):
         return functools.reduce(operator.mul, self.conv_stride, 1)
-
-
-__all__ = ["Wav2Vec2ConformerConfig"]

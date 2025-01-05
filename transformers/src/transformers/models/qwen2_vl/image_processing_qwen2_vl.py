@@ -456,6 +456,3 @@ class Qwen2VLImageProcessor(BaseImageProcessor):
             data = {"pixel_values_videos": pixel_values, "video_grid_thw": vision_grid_thws}
 
         return BatchFeature(data=data, tensor_type=return_tensors)
-
-
-__all__ = ["Qwen2VLImageProcessor"]

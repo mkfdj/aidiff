@@ -2302,13 +2302,3 @@ class ClapAudioModelWithProjection(ClapPreTrainedModel):
             attentions=audio_outputs.attentions,
             hidden_states=audio_outputs.hidden_states,
         )
-
-
-__all__ = [
-    "ClapModel",
-    "ClapPreTrainedModel",
-    "ClapTextModel",
-    "ClapTextModelWithProjection",
-    "ClapAudioModel",
-    "ClapAudioModelWithProjection",
-]

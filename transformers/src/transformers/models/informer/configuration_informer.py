@@ -244,6 +244,3 @@ class InformerConfig(PretrainedConfig):
             + self.num_static_real_features
             + self.input_size * 2  # the log1p(abs(loc)) and log(scale) features
         )
-
-
-__all__ = ["InformerConfig"]

@@ -152,6 +152,3 @@ class DecisionTransformerConfig(PretrainedConfig):
         self.eos_token_id = eos_token_id
 
         super().__init__(bos_token_id=bos_token_id, eos_token_id=eos_token_id, **kwargs)
-
-
-__all__ = ["DecisionTransformerConfig"]

@@ -1513,15 +1513,3 @@ append_call_sample_docstring(
     FlaxCausalLMOutputWithCrossAttentions,
     _CONFIG_FOR_DOC,
 )
-
-
-__all__ = [
-    "FlaxRobertaPreLayerNormForCausalLM",
-    "FlaxRobertaPreLayerNormForMaskedLM",
-    "FlaxRobertaPreLayerNormForMultipleChoice",
-    "FlaxRobertaPreLayerNormForQuestionAnswering",
-    "FlaxRobertaPreLayerNormForSequenceClassification",
-    "FlaxRobertaPreLayerNormForTokenClassification",
-    "FlaxRobertaPreLayerNormModel",
-    "FlaxRobertaPreLayerNormPreTrainedModel",
-]

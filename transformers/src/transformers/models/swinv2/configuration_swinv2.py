@@ -154,6 +154,3 @@ class Swinv2Config(BackboneConfigMixin, PretrainedConfig):
         # we set the hidden_size attribute in order to make Swinv2 work with VisionEncoderDecoderModel
         # this indicates the channel dimension after the last stage of the model
         self.hidden_size = int(embed_dim * 2 ** (len(depths) - 1))
-
-
-__all__ = ["Swinv2Config"]

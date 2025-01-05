@@ -605,6 +605,3 @@ class VipLlavaForConditionalGeneration(VipLlavaPreTrainedModel, GenerationMixin)
             model_inputs["pixel_values"] = pixel_values
 
         return model_inputs
-
-
-__all__ = ["VipLlavaForConditionalGeneration", "VipLlavaPreTrainedModel"]

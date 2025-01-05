@@ -1519,10 +1519,3 @@ overwrite_call_docstring(
 append_replace_return_docstrings(
     FlaxBlenderbotSmallForConditionalGeneration, output_type=FlaxSeq2SeqLMOutput, config_class=_CONFIG_FOR_DOC
 )
-
-
-__all__ = [
-    "FlaxBlenderbotSmallForConditionalGeneration",
-    "FlaxBlenderbotSmallModel",
-    "FlaxBlenderbotSmallPreTrainedModel",
-]

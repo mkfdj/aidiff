@@ -2671,6 +2671,3 @@ class GroundingDinoForObjectDetection(GroundingDinoPreTrainedModel):
         )
 
         return dict_outputs
-
-
-__all__ = ["GroundingDinoForObjectDetection", "GroundingDinoModel", "GroundingDinoPreTrainedModel"]

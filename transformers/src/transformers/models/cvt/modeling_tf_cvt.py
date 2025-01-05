@@ -1091,6 +1091,3 @@ class TFCvtForImageClassification(TFCvtPreTrainedModel, TFSequenceClassification
             if hasattr(self.classifier, "name"):
                 with tf.name_scope(self.classifier.name):
                     self.classifier.build([None, None, self.config.embed_dim[-1]])
-
-
-__all__ = ["TFCvtForImageClassification", "TFCvtModel", "TFCvtPreTrainedModel"]

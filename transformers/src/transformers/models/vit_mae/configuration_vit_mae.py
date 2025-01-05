@@ -135,6 +135,3 @@ class ViTMAEConfig(PretrainedConfig):
         self.decoder_intermediate_size = decoder_intermediate_size
         self.mask_ratio = mask_ratio
         self.norm_pix_loss = norm_pix_loss
-
-
-__all__ = ["ViTMAEConfig"]

@@ -1466,6 +1466,3 @@ class MarkupLMTokenizer(PreTrainedTokenizer):
                 raise ValueError("Invalid padding strategy:" + str(padding_side))
 
         return encoded_inputs
-
-
-__all__ = ["MarkupLMTokenizer"]

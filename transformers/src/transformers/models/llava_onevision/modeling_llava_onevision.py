@@ -804,6 +804,3 @@ class LlavaOnevisionForConditionalGeneration(LlavaOnevisionPreTrainedModel, Gene
             model_inputs["image_sizes_videos"] = image_sizes_videos
 
         return model_inputs
-
-
-__all__ = ["LlavaOnevisionForConditionalGeneration", "LlavaOnevisionPreTrainedModel"]

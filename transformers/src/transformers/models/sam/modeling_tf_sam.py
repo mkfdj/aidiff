@@ -1650,6 +1650,3 @@ class TFSamModel(TFSamPreTrainedModel):
         if getattr(self, "mask_decoder", None) is not None:
             with tf.name_scope(self.mask_decoder.name):
                 self.mask_decoder.build(None)
-
-
-__all__ = ["TFSamModel", "TFSamPreTrainedModel"]

@@ -145,6 +145,3 @@ class RoFormerOnnxConfig(OnnxConfig):
                 ("token_type_ids", dynamic_axis),
             ]
         )
-
-
-__all__ = ["RoFormerConfig", "RoFormerOnnxConfig"]

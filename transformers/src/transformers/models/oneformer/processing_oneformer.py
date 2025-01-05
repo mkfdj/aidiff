@@ -202,6 +202,3 @@ class OneFormerProcessor(ProcessorMixin):
         Please refer to the docstring of this method for more information.
         """
         return self.image_processor.post_process_panoptic_segmentation(*args, **kwargs)
-
-
-__all__ = ["OneFormerProcessor"]

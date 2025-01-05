@@ -512,6 +512,3 @@ class DPTImageProcessor(BaseImageProcessor):
             results.append({"predicted_depth": depth})
 
         return results
-
-
-__all__ = ["DPTImageProcessor"]

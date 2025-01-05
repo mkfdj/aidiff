@@ -1028,12 +1028,3 @@ class BioGptForSequenceClassification(BioGptPreTrainedModel):
 
     def set_input_embeddings(self, value):
         self.biogpt.embed_tokens = value
-
-
-__all__ = [
-    "BioGptForCausalLM",
-    "BioGptForTokenClassification",
-    "BioGptForSequenceClassification",
-    "BioGptModel",
-    "BioGptPreTrainedModel",
-]

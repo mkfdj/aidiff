@@ -135,6 +135,3 @@ class UperNetConfig(PretrainedConfig):
         self.auxiliary_num_convs = auxiliary_num_convs
         self.auxiliary_concat_input = auxiliary_concat_input
         self.loss_ignore_index = loss_ignore_index
-
-
-__all__ = ["UperNetConfig"]

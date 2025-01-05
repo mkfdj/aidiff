@@ -1711,17 +1711,3 @@ append_call_sample_docstring(
     FlaxCausalLMOutputWithCrossAttentions,
     _CONFIG_FOR_DOC,
 )
-
-
-__all__ = [
-    "FlaxBertForCausalLM",
-    "FlaxBertForMaskedLM",
-    "FlaxBertForMultipleChoice",
-    "FlaxBertForNextSentencePrediction",
-    "FlaxBertForPreTraining",
-    "FlaxBertForQuestionAnswering",
-    "FlaxBertForSequenceClassification",
-    "FlaxBertForTokenClassification",
-    "FlaxBertModel",
-    "FlaxBertPreTrainedModel",
-]

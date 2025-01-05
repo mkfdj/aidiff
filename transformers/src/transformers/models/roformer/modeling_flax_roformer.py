@@ -1078,14 +1078,3 @@ append_call_sample_docstring(
     FlaxQuestionAnsweringModelOutput,
     _CONFIG_FOR_DOC,
 )
-
-
-__all__ = [
-    "FlaxRoFormerForMaskedLM",
-    "FlaxRoFormerForMultipleChoice",
-    "FlaxRoFormerForQuestionAnswering",
-    "FlaxRoFormerForSequenceClassification",
-    "FlaxRoFormerForTokenClassification",
-    "FlaxRoFormerModel",
-    "FlaxRoFormerPreTrainedModel",
-]

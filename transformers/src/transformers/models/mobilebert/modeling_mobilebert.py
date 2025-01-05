@@ -1617,18 +1617,3 @@ class MobileBertForTokenClassification(MobileBertPreTrainedModel):
             hidden_states=outputs.hidden_states,
             attentions=outputs.attentions,
         )
-
-
-__all__ = [
-    "MobileBertForMaskedLM",
-    "MobileBertForMultipleChoice",
-    "MobileBertForNextSentencePrediction",
-    "MobileBertForPreTraining",
-    "MobileBertForQuestionAnswering",
-    "MobileBertForSequenceClassification",
-    "MobileBertForTokenClassification",
-    "MobileBertLayer",
-    "MobileBertModel",
-    "MobileBertPreTrainedModel",
-    "load_tf_weights_in_mobilebert",
-]

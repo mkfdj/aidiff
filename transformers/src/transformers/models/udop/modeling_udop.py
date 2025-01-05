@@ -1538,7 +1538,7 @@ class UdopStack(UdopPreTrainedModel):
         output_attentions: bool,
     ):
         if self.config._attn_implementation == "flash_attention_2":
-            if attention_mask is not None and (attention_mask == 0.0).any():
+            if attention_mask is not None and 0.0 in attention_mask:
                 return attention_mask
             return None
 
@@ -2154,6 +2154,3 @@ class UdopEncoderModel(UdopPreTrainedModel):
         )
 
         return encoder_outputs
-
-
-__all__ = ["UdopForConditionalGeneration", "UdopPreTrainedModel", "UdopModel", "UdopEncoderModel"]

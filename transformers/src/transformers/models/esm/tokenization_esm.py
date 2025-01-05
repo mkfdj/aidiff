@@ -142,6 +142,3 @@ class EsmTokenizer(PreTrainedTokenizer):
     @property
     def vocab_size(self) -> int:
         return len(self.all_tokens)
-
-
-__all__ = ["EsmTokenizer"]

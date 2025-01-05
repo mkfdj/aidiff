@@ -613,6 +613,3 @@ class SegGptImageProcessor(BaseImageProcessor):
             semantic_segmentation.append(pred)
 
         return semantic_segmentation
-
-
-__all__ = ["SegGptImageProcessor"]

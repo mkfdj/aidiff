@@ -130,6 +130,3 @@ class GLPNConfig(PretrainedConfig):
         self.decoder_hidden_size = decoder_hidden_size
         self.max_depth = max_depth
         self.head_in_index = head_in_index
-
-
-__all__ = ["GLPNConfig"]

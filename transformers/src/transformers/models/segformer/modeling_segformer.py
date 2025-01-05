@@ -826,13 +826,3 @@ class SegformerForSemanticSegmentation(SegformerPreTrainedModel):
             hidden_states=outputs.hidden_states if output_hidden_states else None,
             attentions=outputs.attentions,
         )
-
-
-__all__ = [
-    "SegformerDecodeHead",
-    "SegformerForImageClassification",
-    "SegformerForSemanticSegmentation",
-    "SegformerLayer",
-    "SegformerModel",
-    "SegformerPreTrainedModel",
-]

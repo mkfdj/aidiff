@@ -1448,14 +1448,3 @@ class LxmertForQuestionAnswering(LxmertPreTrainedModel):
             vision_attentions=lxmert_output.vision_attentions,
             cross_encoder_attentions=lxmert_output.cross_encoder_attentions,
         )
-
-
-__all__ = [
-    "LxmertEncoder",
-    "LxmertForPreTraining",
-    "LxmertForQuestionAnswering",
-    "LxmertModel",
-    "LxmertPreTrainedModel",
-    "LxmertVisualFeatureEncoder",
-    "LxmertXLayer",
-]

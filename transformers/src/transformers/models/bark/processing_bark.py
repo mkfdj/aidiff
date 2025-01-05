@@ -285,6 +285,3 @@ class BarkProcessor(ProcessorMixin):
             encoded_text["history_prompt"] = voice_preset
 
         return encoded_text
-
-
-__all__ = ["BarkProcessor"]

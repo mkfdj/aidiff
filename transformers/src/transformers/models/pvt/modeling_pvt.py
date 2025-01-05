@@ -666,6 +666,3 @@ class PvtForImageClassification(PvtPreTrainedModel):
             hidden_states=outputs.hidden_states,
             attentions=outputs.attentions,
         )
-
-
-__all__ = ["PvtForImageClassification", "PvtModel", "PvtPreTrainedModel"]

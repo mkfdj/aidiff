@@ -556,6 +556,3 @@ class ZoeDepthImageProcessor(BaseImageProcessor):
             results.append({"predicted_depth": depth})
 
         return results
-
-
-__all__ = ["ZoeDepthImageProcessor"]

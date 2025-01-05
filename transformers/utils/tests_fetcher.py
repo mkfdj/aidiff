@@ -995,7 +995,9 @@ def _print_list(l) -> str:
 
 
 def infer_tests_to_run(
-    output_file: str, diff_with_last_commit: bool = False, filter_models: bool = False, test_all: bool = False
+    output_file: str,
+    diff_with_last_commit: bool = False,
+    filter_models: bool = False,
 ):
     """
     The main function called by the test fetcher. Determines the tests to run from the diff.
@@ -1016,11 +1018,7 @@ def infer_tests_to_run(
             Whether or not to filter the tests to core models only, when a file modified results in a lot of model
             tests.
     """
-    if not test_all:
-        modified_files = get_modified_python_files(diff_with_last_commit=diff_with_last_commit)
-    else:
-        modified_files = [str(k) for k in PATH_TO_TESTS.glob("*/*") if str(k).endswith(".py") and "test_" in str(k)]
-        print("\n### test_all is TRUE, FETCHING ALL FILES###\n")
+    modified_files = get_modified_python_files(diff_with_last_commit=diff_with_last_commit)
     print(f"\n### MODIFIED FILES ###\n{_print_list(modified_files)}")
 
     # Create the map that will give us all impacted modules.
@@ -1232,6 +1230,5 @@ if __name__ == "__main__":
             args.output_file,
             diff_with_last_commit=diff_with_last_commit,
             filter_models=False,
-            test_all=commit_flags["test_all"],
         )
         filter_tests(args.output_file, ["repo_utils"])

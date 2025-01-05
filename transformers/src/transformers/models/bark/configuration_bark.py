@@ -298,6 +298,3 @@ class BarkConfig(PretrainedConfig):
             codec_config=codec_config.to_dict(),
             **kwargs,
         )
-
-
-__all__ = ["BarkCoarseConfig", "BarkConfig", "BarkFineConfig", "BarkSemanticConfig"]

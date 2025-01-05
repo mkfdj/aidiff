@@ -346,6 +346,3 @@ class PhobertTokenizer(PreTrainedTokenizer):
                 raise ValueError("Incorrect dictionary format, expected '<token> <cnt>'")
             word = line[:idx]
             self.encoder[word] = len(self.encoder)
-
-
-__all__ = ["PhobertTokenizer"]

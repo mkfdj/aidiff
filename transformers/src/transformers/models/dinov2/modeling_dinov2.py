@@ -913,6 +913,3 @@ class Dinov2Backbone(Dinov2PreTrainedModel, BackboneMixin):
             hidden_states=outputs.hidden_states if output_hidden_states else None,
             attentions=outputs.attentions if output_attentions else None,
         )
-
-
-__all__ = ["Dinov2ForImageClassification", "Dinov2Model", "Dinov2PreTrainedModel", "Dinov2Backbone"]

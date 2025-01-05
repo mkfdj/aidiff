@@ -699,6 +699,3 @@ overwrite_call_docstring(FlaxResNetForImageClassification, FLAX_VISION_CLASSIF_D
 append_replace_return_docstrings(
     FlaxResNetForImageClassification, output_type=FlaxImageClassifierOutputWithNoAttention, config_class=ResNetConfig
 )
-
-
-__all__ = ["FlaxResNetForImageClassification", "FlaxResNetModel", "FlaxResNetPreTrainedModel"]

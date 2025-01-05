@@ -114,6 +114,3 @@ class VivitConfig(PretrainedConfig):
         self.qkv_bias = qkv_bias
 
         super().__init__(**kwargs)
-
-
-__all__ = ["VivitConfig"]

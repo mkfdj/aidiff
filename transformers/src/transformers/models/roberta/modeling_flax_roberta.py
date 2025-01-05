@@ -1486,15 +1486,3 @@ append_call_sample_docstring(
     FlaxCausalLMOutputWithCrossAttentions,
     _CONFIG_FOR_DOC,
 )
-
-
-__all__ = [
-    "FlaxRobertaForCausalLM",
-    "FlaxRobertaForMaskedLM",
-    "FlaxRobertaForMultipleChoice",
-    "FlaxRobertaForQuestionAnswering",
-    "FlaxRobertaForSequenceClassification",
-    "FlaxRobertaForTokenClassification",
-    "FlaxRobertaModel",
-    "FlaxRobertaPreTrainedModel",
-]

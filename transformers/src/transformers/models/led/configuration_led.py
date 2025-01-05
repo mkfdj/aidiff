@@ -160,6 +160,3 @@ class LEDConfig(PretrainedConfig):
             decoder_start_token_id=decoder_start_token_id,
             **kwargs,
         )
-
-
-__all__ = ["LEDConfig"]

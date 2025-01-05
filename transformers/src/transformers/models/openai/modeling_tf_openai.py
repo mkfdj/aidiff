@@ -935,13 +935,3 @@ class TFOpenAIGPTForSequenceClassification(TFOpenAIGPTPreTrainedModel, TFSequenc
         if getattr(self, "transformer", None) is not None:
             with tf.name_scope(self.transformer.name):
                 self.transformer.build(None)
-
-
-__all__ = [
-    "TFOpenAIGPTDoubleHeadsModel",
-    "TFOpenAIGPTForSequenceClassification",
-    "TFOpenAIGPTLMHeadModel",
-    "TFOpenAIGPTMainLayer",
-    "TFOpenAIGPTModel",
-    "TFOpenAIGPTPreTrainedModel",
-]

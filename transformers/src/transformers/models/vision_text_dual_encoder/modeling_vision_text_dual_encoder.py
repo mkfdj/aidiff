@@ -534,6 +534,3 @@ class VisionTextDualEncoderModel(PreTrainedModel):
         )
 
         return model
-
-
-__all__ = ["VisionTextDualEncoderModel"]

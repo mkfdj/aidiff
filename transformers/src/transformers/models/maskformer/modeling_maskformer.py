@@ -1876,6 +1876,3 @@ class MaskFormerForInstanceSegmentation(MaskFormerPreTrainedModel):
             masks_queries_logits=masks_queries_logits,
             auxiliary_logits=auxiliary_logits,
         )
-
-
-__all__ = ["MaskFormerForInstanceSegmentation", "MaskFormerModel", "MaskFormerPreTrainedModel"]

@@ -149,6 +149,3 @@ class Data2VecTextOnnxConfig(OnnxConfig):
                 ("attention_mask", dynamic_axis),
             ]
         )
-
-
-__all__ = ["Data2VecTextConfig", "Data2VecTextOnnxConfig"]

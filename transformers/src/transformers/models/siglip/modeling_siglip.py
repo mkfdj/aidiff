@@ -438,6 +438,7 @@ class SiglipFlashAttention2(SiglipAttention):
 
     is_causal = False
 
+    # Copied from transformers.models.llama.modeling_llama.LlamaFlashAttention2.__init__
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -1566,12 +1567,3 @@ class SiglipForImageClassification(SiglipPreTrainedModel):
             hidden_states=outputs.hidden_states,
             attentions=outputs.attentions,
         )
-
-
-__all__ = [
-    "SiglipModel",
-    "SiglipPreTrainedModel",
-    "SiglipTextModel",
-    "SiglipVisionModel",
-    "SiglipForImageClassification",
-]

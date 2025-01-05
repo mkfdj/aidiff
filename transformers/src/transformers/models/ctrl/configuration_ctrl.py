@@ -111,6 +111,3 @@ class CTRLConfig(PretrainedConfig):
         self.use_cache = use_cache
 
         super().__init__(**kwargs)
-
-
-__all__ = ["CTRLConfig"]

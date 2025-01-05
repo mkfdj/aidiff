@@ -33,7 +33,7 @@ if is_vision_available():
     from transformers import SegformerImageProcessor
 
 
-class SegformerImageProcessingTester:
+class SegformerImageProcessingTester(unittest.TestCase):
     def __init__(
         self,
         parent,

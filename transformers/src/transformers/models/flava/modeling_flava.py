@@ -2102,14 +2102,3 @@ class FlavaForPreTraining(FlavaPreTrainedModel):
             mmm_image_logits=mmm_image_logits,
             mmm_text_logits=mmm_text_logits,
         )
-
-
-__all__ = [
-    "FlavaForPreTraining",
-    "FlavaImageCodebook",
-    "FlavaImageModel",
-    "FlavaModel",
-    "FlavaMultimodalModel",
-    "FlavaPreTrainedModel",
-    "FlavaTextModel",
-]

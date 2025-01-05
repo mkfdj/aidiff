@@ -352,8 +352,6 @@ A [`Constraint`] can be used to force the generation to include specific tokens 
 
 [[autodoc]] TextIteratorStreamer
 
-[[autodoc]] AsyncTextIteratorStreamer
-
 ## Caches
 
 [[autodoc]] Cache

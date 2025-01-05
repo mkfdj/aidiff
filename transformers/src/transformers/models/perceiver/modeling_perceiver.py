@@ -3499,17 +3499,3 @@ class PerceiverMultimodalPreprocessor(AbstractPreprocessor):
         final_inputs = torch.cat(padded_ls, dim=1)
 
         return final_inputs, modality_sizes, inputs_without_pos
-
-
-__all__ = [
-    "PerceiverForImageClassificationConvProcessing",
-    "PerceiverForImageClassificationFourier",
-    "PerceiverForImageClassificationLearned",
-    "PerceiverForMaskedLM",
-    "PerceiverForMultimodalAutoencoding",
-    "PerceiverForOpticalFlow",
-    "PerceiverForSequenceClassification",
-    "PerceiverLayer",
-    "PerceiverModel",
-    "PerceiverPreTrainedModel",
-]

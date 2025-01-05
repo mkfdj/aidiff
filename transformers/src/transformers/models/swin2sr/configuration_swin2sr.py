@@ -149,6 +149,3 @@ class Swin2SRConfig(PretrainedConfig):
         self.img_range = img_range
         self.resi_connection = resi_connection
         self.upsampler = upsampler
-
-
-__all__ = ["Swin2SRConfig"]

@@ -719,6 +719,3 @@ class DacModel(DacPreTrainedModel):
             return (loss, audio_values, quantized_representation, audio_codes, projected_latents)
 
         return DacOutput(loss, audio_values, quantized_representation, audio_codes, projected_latents)
-
-
-__all__ = ["DacModel", "DacPreTrainedModel"]

@@ -343,6 +343,3 @@ class VideoMAEImageProcessor(BaseImageProcessor):
 
         data = {"pixel_values": videos}
         return BatchFeature(data=data, tensor_type=return_tensors)
-
-
-__all__ = ["VideoMAEImageProcessor"]

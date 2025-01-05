@@ -1331,16 +1331,3 @@ class ConvBertForQuestionAnswering(ConvBertPreTrainedModel):
             hidden_states=outputs.hidden_states,
             attentions=outputs.attentions,
         )
-
-
-__all__ = [
-    "ConvBertForMaskedLM",
-    "ConvBertForMultipleChoice",
-    "ConvBertForQuestionAnswering",
-    "ConvBertForSequenceClassification",
-    "ConvBertForTokenClassification",
-    "ConvBertLayer",
-    "ConvBertModel",
-    "ConvBertPreTrainedModel",
-    "load_tf_weights_in_convbert",
-]

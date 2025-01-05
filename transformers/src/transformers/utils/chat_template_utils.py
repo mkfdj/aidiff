@@ -15,7 +15,6 @@
 import inspect
 import json
 import re
-import types
 from contextlib import contextmanager
 from datetime import datetime
 from functools import lru_cache
@@ -98,7 +97,7 @@ def _parse_type_hint(hint: str) -> Dict:
                 "Couldn't parse this type hint, likely due to a custom class or object: ", hint
             )
 
-    elif origin is Union or (hasattr(types, "UnionType") and origin is types.UnionType):
+    elif origin is Union:
         # Recurse into each of the subtypes in the Union, except None, which is handled separately at the end
         subtypes = [_parse_type_hint(t) for t in args if t is not type(None)]
         if len(subtypes) == 1:

@@ -668,6 +668,3 @@ class VisionEncoderDecoderModel(PreTrainedModel, GenerationMixin):
     def _reorder_cache(self, past_key_values, beam_idx):
         # apply decoder cache reordering here
         return self.decoder._reorder_cache(past_key_values, beam_idx)
-
-
-__all__ = ["VisionEncoderDecoderModel"]

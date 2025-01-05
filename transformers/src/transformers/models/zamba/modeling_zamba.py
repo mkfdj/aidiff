@@ -312,6 +312,7 @@ class ZambaFlashAttention2(ZambaAttention):
     flash attention and deal with padding tokens in case the input contains any of them.
     """
 
+    # Copied from transformers.models.llama.modeling_llama.LlamaFlashAttention2.__init__
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -773,7 +774,6 @@ class ZambaMambaMixer(nn.Module):
 class ZambaMLP(nn.Module):
     def __init__(self, config):
         super().__init__()
-        self.config = config
         self.hidden_size = config.hidden_size
         self.intermediate_size = config.intermediate_size
         self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias=False)
@@ -781,9 +781,8 @@ class ZambaMLP(nn.Module):
         self.down_proj = nn.Linear(self.intermediate_size, self.hidden_size, bias=False)
         self.act_fn = ACT2FN[config.hidden_act]
 
-    def forward(self, x):
-        down_proj = self.down_proj(self.act_fn(self.gate_proj(x)) * self.up_proj(x))
-        return down_proj
+    def forward(self, hidden_state):
+        return self.down_proj(self.act_fn(self.gate_proj(hidden_state)) * self.up_proj(hidden_state))
 
 
 class ZambaAttentionDecoderLayer(nn.Module):
@@ -1670,6 +1669,3 @@ class ZambaForSequenceClassification(ZambaPreTrainedModel):
             hidden_states=transformer_outputs.hidden_states,
             attentions=transformer_outputs.attentions,
         )
-
-
-__all__ = ["ZambaForCausalLM", "ZambaForSequenceClassification", "ZambaModel", "ZambaPreTrainedModel"]

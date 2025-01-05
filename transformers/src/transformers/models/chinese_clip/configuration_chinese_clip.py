@@ -429,6 +429,3 @@ class ChineseCLIPOnnxConfig(OnnxConfig):
     @property
     def default_onnx_opset(self) -> int:
         return 14
-
-
-__all__ = ["ChineseCLIPConfig", "ChineseCLIPOnnxConfig", "ChineseCLIPTextConfig", "ChineseCLIPVisionConfig"]

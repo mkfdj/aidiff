@@ -24,7 +24,6 @@ from torch import nn
 from transformers.models.llava_next.modeling_llava_next import (
     LlavaNextCausalLMOutputWithPast,
     LlavaNextForConditionalGeneration,
-    LlavaNextPreTrainedModel,
     image_size_to_num_patches,
 )
 
@@ -217,10 +216,6 @@ class LlavaNextVideoPooler(nn.Module):
         image_features_spatial_pool = self.pool(image_features_spatial)
 
         return image_features_spatial_pool.flatten(2).transpose(1, 2).contiguous()
-
-
-class LlavaNextVideoPreTrainedModel(LlavaNextPreTrainedModel):
-    pass
 
 
 class LlavaNextVideoForConditionalGeneration(LlavaNextForConditionalGeneration):
@@ -646,6 +641,3 @@ class LlavaNextVideoForConditionalGeneration(LlavaNextForConditionalGeneration):
             model_inputs["image_sizes"] = image_sizes
 
         return model_inputs
-
-
-__all__ = ["LlavaNextVideoConfig", "LlavaNextVideoForConditionalGeneration", "LlavaNextVideoPreTrainedModel"]

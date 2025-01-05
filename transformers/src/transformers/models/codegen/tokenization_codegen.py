@@ -414,6 +414,3 @@ class CodeGenTokenizer(PreTrainedTokenizer):
             return completion[: min(terminals_pos)]
         else:
             return completion
-
-
-__all__ = ["CodeGenTokenizer"]

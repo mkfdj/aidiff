@@ -189,6 +189,3 @@ class GraniteMoeConfig(PretrainedConfig):
         )
 
         rope_config_validation(self)
-
-
-__all__ = ["GraniteMoeConfig"]

@@ -232,6 +232,3 @@ class MimiConfig(PretrainedConfig):
     def num_codebooks(self) -> int:
         # alias to num_quantizers
         return self.num_quantizers
-
-
-__all__ = ["MimiConfig"]

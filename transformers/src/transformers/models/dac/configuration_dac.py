@@ -109,6 +109,3 @@ class DacConfig(PretrainedConfig):
     def frame_rate(self) -> int:
         hop_length = np.prod(self.upsampling_ratios)
         return math.ceil(self.sampling_rate / hop_length)
-
-
-__all__ = ["DacConfig"]

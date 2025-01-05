@@ -1816,17 +1816,3 @@ class MegatronBertForQuestionAnswering(MegatronBertPreTrainedModel):
             hidden_states=outputs.hidden_states,
             attentions=outputs.attentions,
         )
-
-
-__all__ = [
-    "MegatronBertForCausalLM",
-    "MegatronBertForMaskedLM",
-    "MegatronBertForMultipleChoice",
-    "MegatronBertForNextSentencePrediction",
-    "MegatronBertForPreTraining",
-    "MegatronBertForQuestionAnswering",
-    "MegatronBertForSequenceClassification",
-    "MegatronBertForTokenClassification",
-    "MegatronBertModel",
-    "MegatronBertPreTrainedModel",
-]

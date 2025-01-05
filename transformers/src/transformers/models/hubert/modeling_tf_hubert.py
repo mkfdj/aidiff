@@ -1670,6 +1670,3 @@ class TFHubertForCTC(TFHubertPreTrainedModel):
         if getattr(self, "lm_head", None) is not None:
             with tf.name_scope(self.lm_head.name):
                 self.lm_head.build([None, None, self.output_hidden_size])
-
-
-__all__ = ["TFHubertForCTC", "TFHubertModel", "TFHubertPreTrainedModel"]

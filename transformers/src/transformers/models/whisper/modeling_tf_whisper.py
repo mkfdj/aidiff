@@ -1756,6 +1756,3 @@ class TFWhisperForConditionalGeneration(TFWhisperPreTrainedModel, TFCausalLangua
         if getattr(self, "model", None) is not None:
             with tf.name_scope(self.model.name):
                 self.model.build(None)
-
-
-__all__ = ["TFWhisperForConditionalGeneration", "TFWhisperModel", "TFWhisperPreTrainedModel"]

@@ -1415,13 +1415,3 @@ class LayoutLMv2ForQuestionAnswering(LayoutLMv2PreTrainedModel):
             hidden_states=outputs.hidden_states,
             attentions=outputs.attentions,
         )
-
-
-__all__ = [
-    "LayoutLMv2ForQuestionAnswering",
-    "LayoutLMv2ForSequenceClassification",
-    "LayoutLMv2ForTokenClassification",
-    "LayoutLMv2Layer",
-    "LayoutLMv2Model",
-    "LayoutLMv2PreTrainedModel",
-]

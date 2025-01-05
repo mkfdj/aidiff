@@ -454,6 +454,3 @@ class UnivNetFeatureExtractor(SequenceFeatureExtractor):
                 del output[name]
 
         return output
-
-
-__all__ = ["UnivNetFeatureExtractor"]

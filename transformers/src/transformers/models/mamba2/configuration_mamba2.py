@@ -178,6 +178,3 @@ class Mamba2Config(PretrainedConfig):
             tie_word_embeddings=tie_word_embeddings,
             **kwargs,
         )
-
-
-__all__ = ["Mamba2Config"]

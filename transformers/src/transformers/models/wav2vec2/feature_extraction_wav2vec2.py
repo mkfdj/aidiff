@@ -238,6 +238,3 @@ class Wav2Vec2FeatureExtractor(SequenceFeatureExtractor):
             padded_inputs = padded_inputs.convert_to_tensors(return_tensors)
 
         return padded_inputs
-
-
-__all__ = ["Wav2Vec2FeatureExtractor"]
