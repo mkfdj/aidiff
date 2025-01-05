@@ -550,7 +550,7 @@ def main():
     # Set seed before initializing model.
     set_seed(training_args.seed)
     
-    if xm.xla_device().is_available():
+    if xm.xla_device() is not None:
         training_args.device = torch.device("xla")
         logger.warning("TPU was successfully detected. Using TPU")
     else:
