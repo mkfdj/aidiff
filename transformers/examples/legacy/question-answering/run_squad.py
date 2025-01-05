@@ -13,8 +13,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-""" Finetuning the library models for question-answering on SQuAD (DistilBERT, Bert, XLM, XLNet)."""
-
+"""Finetuning the library models for question-answering on SQuAD (DistilBERT, Bert, XLM, XLNet)."""
 
 import argparse
 import glob
@@ -66,7 +65,7 @@ def set_seed(args):
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
     if args.n_gpu > 0:
-        torch.to(xm.xla_device()).manual_seed_all(args.seed)
+        torch.cuda.manual_seed_all(args.seed)
 
 
 def to_list(tensor):
@@ -148,7 +147,7 @@ def train(args, train_dataset, model, tokenizer):
     # Check if continuing training from a checkpoint
     if os.path.exists(args.model_name_or_path):
         try:
-            # set global_step to gobal_step of last saved checkpoint from model path
+            # set global_step to global_step of last saved checkpoint from model path
             checkpoint_suffix = args.model_name_or_path.split("-")[-1].split("/")[0]
             global_step = int(checkpoint_suffix)
             epochs_trained = global_step // (len(train_dataloader) // args.gradient_accumulation_steps)
@@ -166,13 +165,12 @@ def train(args, train_dataset, model, tokenizer):
     train_iterator = trange(
         epochs_trained, int(args.num_train_epochs), desc="Epoch", disable=args.local_rank not in [-1, 0]
     )
-    # Added here for reproductibility
+    # Added here for reproducibility
     set_seed(args)
 
     for _ in train_iterator:
         epoch_iterator = tqdm(train_dataloader, desc="Iteration", disable=args.local_rank not in [-1, 0])
         for step, batch in enumerate(epoch_iterator):
-
             # Skip past any already trained steps if resuming training
             if steps_trained_in_current_epoch > 0:
                 steps_trained_in_current_epoch -= 1
@@ -551,8 +549,10 @@ def main():
         "--max_seq_length",
         default=384,
         type=int,
-        help="The maximum total input sequence length after WordPiece tokenization. Sequences "
-        "longer than this will be truncated, and sequences shorter than this will be padded.",
+        help=(
+            "The maximum total input sequence length after WordPiece tokenization. Sequences "
+            "longer than this will be truncated, and sequences shorter than this will be padded."
+        ),
     )
     parser.add_argument(
         "--doc_stride",
@@ -564,8 +564,10 @@ def main():
         "--max_query_length",
         default=64,
         type=int,
-        help="The maximum number of tokens for the question. Questions longer than this will "
-        "be truncated to this length.",
+        help=(
+            "The maximum number of tokens for the question. Questions longer than this will "
+            "be truncated to this length."
+        ),
     )
     parser.add_argument("--do_train", action="store_true", help="Whether to run training.")
     parser.add_argument("--do_eval", action="store_true", help="Whether to run eval on the dev set.")
@@ -610,20 +612,27 @@ def main():
         "--max_answer_length",
         default=30,
         type=int,
-        help="The maximum length of an answer that can be generated. This is needed because the start "
-        "and end predictions are not conditioned on one another.",
+        help=(
+            "The maximum length of an answer that can be generated. This is needed because the start "
+            "and end predictions are not conditioned on one another."
+        ),
     )
     parser.add_argument(
         "--verbose_logging",
         action="store_true",
-        help="If true, all of the warnings related to data processing will be printed. "
-        "A number of warnings are expected for a normal SQuAD evaluation.",
+        help=(
+            "If true, all of the warnings related to data processing will be printed. "
+            "A number of warnings are expected for a normal SQuAD evaluation."
+        ),
     )
     parser.add_argument(
         "--lang_id",
         default=0,
         type=int,
-        help="language id of input for language-specific xlm models (see tokenization_xlm.PRETRAINED_INIT_CONFIGURATION)",
+        help=(
+            "language id of input for language-specific xlm models (see"
+            " tokenization_xlm.PRETRAINED_INIT_CONFIGURATION)"
+        ),
     )
 
     parser.add_argument("--logging_steps", type=int, default=500, help="Log every X updates steps.")
@@ -652,8 +661,10 @@ def main():
         "--fp16_opt_level",
         type=str,
         default="O1",
-        help="For fp16: Apex AMP optimization level selected in ['O0', 'O1', 'O2', and 'O3']."
-        "See details at https://nvidia.github.io/apex/amp.html",
+        help=(
+            "For fp16: Apex AMP optimization level selected in ['O0', 'O1', 'O2', and 'O3']. "
+            "See details at https://nvidia.github.io/apex/amp.html"
+        ),
     )
     parser.add_argument("--server_ip", type=str, default="", help="Can be used for distant debugging.")
     parser.add_argument("--server_port", type=str, default="", help="Can be used for distant debugging.")
@@ -691,10 +702,10 @@ def main():
 
     # Setup CUDA, GPU & distributed training
     if args.local_rank == -1 or args.no_cuda:
-        device = torch.device("cuda" if torch.to(xm.xla_device()).is_available() and not args.no_cuda else "cpu")
-        args.n_gpu = 0 if args.no_cuda else torch.to(xm.xla_device()).device_count()
-    else:  # Initializes the distributed backend which will take care of sychronizing nodes/GPUs
-        torch.to(xm.xla_device()).set_device(args.local_rank)
+        device = torch.device("cuda" if torch.cuda.is_available() and not args.no_cuda else "cpu")
+        args.n_gpu = 0 if args.no_cuda else torch.cuda.device_count()
+    else:  # Initializes the distributed backend which will take care of synchronizing nodes/GPUs
+        torch.cuda.set_device(args.local_rank)
         device = torch.device("cuda", args.local_rank)
         torch.distributed.init_process_group(backend="nccl")
         args.n_gpu = 1
@@ -798,10 +809,10 @@ def main():
             logger.info("Loading checkpoints saved during training for evaluation")
             checkpoints = [args.output_dir]
             if args.eval_all_checkpoints:
-                checkpoints = list(
+                checkpoints = [
                     os.path.dirname(c)
                     for c in sorted(glob.glob(args.output_dir + "/**/" + WEIGHTS_NAME, recursive=True))
-                )
+                ]
 
         else:
             logger.info("Loading checkpoint %s for evaluation", args.model_name_or_path)
@@ -818,7 +829,7 @@ def main():
             # Evaluate
             result = evaluate(args, model, tokenizer, prefix=global_step)
 
-            result = dict((k + ("_{}".format(global_step) if global_step else ""), v) for k, v in result.items())
+            result = {k + ("_{}".format(global_step) if global_step else ""): v for k, v in result.items()}
             results.update(result)
 
     logger.info("Results: {}".format(results))

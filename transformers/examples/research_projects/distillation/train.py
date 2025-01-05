@@ -16,6 +16,7 @@
 Training the distilled model.
 Supported architectures include: BERT -> DistilBERT, RoBERTa -> DistilRoBERTa, GPT2 -> DistilGPT2.
 """
+
 import argparse
 import json
 import os
@@ -24,10 +25,9 @@ import shutil
 
 import numpy as np
 import torch
-import torch_xla.core.xla_model as xm
-
 from distiller import Distiller
 from lm_seqs_dataset import LmSeqsDataset
+
 from transformers import (
     BertConfig,
     BertForMaskedLM,
@@ -134,7 +134,7 @@ def main():
         "--alpha_mlm",
         default=0.0,
         type=float,
-        help="Linear weight for the MLM loss. Must be >=0. Should be used in coonjunction with `mlm` flag.",
+        help="Linear weight for the MLM loss. Must be >=0. Should be used in conjunction with `mlm` flag.",
     )
     parser.add_argument("--alpha_clm", default=0.5, type=float, help="Linear weight for the CLM loss. Must be >=0.")
     parser.add_argument("--alpha_mse", default=0.0, type=float, help="Linear weight of the MSE loss. Must be >=0.")
@@ -165,7 +165,7 @@ def main():
     parser.add_argument(
         "--restrict_ce_to_mask",
         action="store_true",
-        help="If true, compute the distilation loss only the [MLM] prediction distribution.",
+        help="If true, compute the distillation loss only the [MLM] prediction distribution.",
     )
     parser.add_argument(
         "--freeze_pos_embs",
@@ -193,7 +193,7 @@ def main():
         help="Gradient accumulation for larger training batches.",
     )
     parser.add_argument("--warmup_prop", default=0.05, type=float, help="Linear warmup proportion.")
-    parser.add_argument("--weight_decay", default=0.0, type=float, help="Weight deay if we apply some.")
+    parser.add_argument("--weight_decay", default=0.0, type=float, help="Weight decay if we apply some.")
     parser.add_argument("--learning_rate", default=5e-4, type=float, help="The initial learning rate for Adam.")
     parser.add_argument("--adam_epsilon", default=1e-6, type=float, help="Epsilon for Adam optimizer.")
     parser.add_argument("--max_grad_norm", default=5.0, type=float, help="Max gradient norm.")
@@ -208,8 +208,10 @@ def main():
         "--fp16_opt_level",
         type=str,
         default="O1",
-        help="For fp16: Apex AMP optimization level selected in ['O0', 'O1', 'O2', and 'O3']."
-        "See details at https://nvidia.github.io/apex/amp.html",
+        help=(
+            "For fp16: Apex AMP optimization level selected in ['O0', 'O1', 'O2', and 'O3']. "
+            "See details at https://nvidia.github.io/apex/amp.html"
+        ),
     )
     parser.add_argument("--n_gpu", type=int, default=1, help="Number of GPUs in the node.")
     parser.add_argument("--local_rank", type=int, default=-1, help="Distributed training - Local rank")
@@ -227,8 +229,8 @@ def main():
         if os.path.exists(args.dump_path):
             if not args.force:
                 raise ValueError(
-                    f"Serialization dir {args.dump_path} already exists, but you have not precised wheter to overwrite it"
-                    "Use `--force` if you want to overwrite it"
+                    f"Serialization dir {args.dump_path} already exists, but you have not precised wheter to overwrite"
+                    " itUse `--force` if you want to overwrite it"
                 )
             else:
                 shutil.rmtree(args.dump_path)
@@ -288,13 +290,13 @@ def main():
         student = student_model_class(stu_architecture_config)
 
     if args.n_gpu > 0:
-        student.to(f"xm.xla_device():{args.local_rank}")
+        student.to(f"cuda:{args.local_rank}")
     logger.info("Student loaded.")
 
     # TEACHER #
     teacher = teacher_model_class.from_pretrained(args.teacher_name, output_hidden_states=True)
     if args.n_gpu > 0:
-        teacher.to(f"xm.xla_device():{args.local_rank}")
+        teacher.to(f"cuda:{args.local_rank}")
     logger.info(f"Teacher loaded from {args.teacher_name}.")
 
     # FREEZING #
@@ -311,7 +313,7 @@ def main():
         assert token_probs.size(0) == stu_architecture_config.vocab_size
 
     # DISTILLER #
-    torch.to(xm.xla_device()).empty_cache()
+    torch.cuda.empty_cache()
     distiller = Distiller(
         params=args, dataset=train_lm_seq_dataset, token_probs=token_probs, student=student, teacher=teacher
     )

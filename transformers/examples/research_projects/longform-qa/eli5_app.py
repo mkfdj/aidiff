@@ -1,12 +1,9 @@
 import datasets
+import faiss
 import numpy as np
-import torch_xla.core.xla_model as xm
 import streamlit as st
 import torch
 from elasticsearch import Elasticsearch
-
-import faiss
-import transformers
 from eli5_utils import (
     embed_questions_for_retrieval,
     make_qa_s2s_model,
@@ -14,6 +11,8 @@ from eli5_utils import (
     query_es_index,
     query_qa_dense_index,
 )
+
+import transformers
 from transformers import AutoModel, AutoModelForSeq2SeqLM, AutoTokenizer
 
 
@@ -25,19 +24,19 @@ LOAD_DENSE_INDEX = True
 def load_models():
     if LOAD_DENSE_INDEX:
         qar_tokenizer = AutoTokenizer.from_pretrained("yjernite/retribert-base-uncased")
-        qar_model = AutoModel.from_pretrained("yjernite/retribert-base-uncased").to("xm.xla_device()")
+        qar_model = AutoModel.from_pretrained("yjernite/retribert-base-uncased").to("cuda:0")
         _ = qar_model.eval()
     else:
         qar_tokenizer, qar_model = (None, None)
     if MODEL_TYPE == "bart":
         s2s_tokenizer = AutoTokenizer.from_pretrained("yjernite/bart_eli5")
-        s2s_model = AutoModelForSeq2SeqLM.from_pretrained("yjernite/bart_eli5").to("xm.xla_device()")
+        s2s_model = AutoModelForSeq2SeqLM.from_pretrained("yjernite/bart_eli5").to("cuda:0")
         save_dict = torch.load("seq2seq_models/eli5_bart_model_blm_2.pth")
         s2s_model.load_state_dict(save_dict["model"])
         _ = s2s_model.eval()
     else:
         s2s_tokenizer, s2s_model = make_qa_s2s_model(
-            model_name="t5-small", from_file="seq2seq_models/eli5_t5_model_1024_4.pth", device="xm.xla_device()"
+            model_name="google-t5/t5-small", from_file="seq2seq_models/eli5_t5_model_1024_4.pth", device="cuda:0"
         )
     return (qar_tokenizer, qar_model, s2s_tokenizer, s2s_model)
 
@@ -131,7 +130,7 @@ def answer_question(
             top_p=top_p,
             top_k=None,
             max_input_length=1024,
-            device="xm.xla_device()",
+            device="cuda:0",
         )[0]
     return (answer, support_list)
 
@@ -159,9 +158,7 @@ header_full = """
     </span>
   </body>
 </html>
-""" % (
-    header_html,
-)
+""" % (header_html,)
 st.sidebar.markdown(
     header_full,
     unsafe_allow_html=True,

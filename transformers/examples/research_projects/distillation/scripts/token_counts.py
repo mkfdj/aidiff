@@ -15,6 +15,7 @@
 """
 Preprocessing script before training the distilled model.
 """
+
 import argparse
 import logging
 import pickle
@@ -43,7 +44,7 @@ if __name__ == "__main__":
     with open(args.data_file, "rb") as fp:
         data = pickle.load(fp)
 
-    logger.info("Counting occurences for MLM.")
+    logger.info("Counting occurrences for MLM.")
     counter = Counter()
     for tk_ids in data:
         counter.update(tk_ids)

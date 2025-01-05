@@ -28,19 +28,19 @@ from pathlib import Path
 from typing import Callable, Optional
 
 import datasets
-import numpy as np
-from datasets import Dataset, load_dataset
-from tqdm import tqdm
-
 import jax
 import jax.numpy as jnp
+import numpy as np
 import optax
-import transformers
+from datasets import Dataset, load_dataset
 from flax.core.frozen_dict import freeze, unfreeze
 from flax.training.common_utils import onehot, stack_forest
 from jax.experimental.maps import mesh
 from jax.experimental.pjit import pjit
 from partitions import set_partitions
+from tqdm import tqdm
+
+import transformers
 from transformers import (
     CONFIG_MAPPING,
     FLAX_MODEL_FOR_CAUSAL_LM_MAPPING,
@@ -69,8 +69,9 @@ class ModelArguments:
     model_name_or_path: Optional[str] = field(
         default=None,
         metadata={
-            "help": "The model checkpoint for weights initialization."
-            "Don't set if you want to train a model from scratch."
+            "help": (
+                "The model checkpoint for weights initialization. Don't set if you want to train a model from scratch."
+            )
         },
     )
     model_type: Optional[str] = field(
@@ -93,7 +94,10 @@ class ModelArguments:
     dtype: Optional[str] = field(
         default="float32",
         metadata={
-            "help": "Floating-point format in which the model weights should be initialized and trained. Choose one of `[float32, float16, bfloat16]`."
+            "help": (
+                "Floating-point format in which the model weights should be initialized and trained. Choose one of"
+                " `[float32, float16, bfloat16]`."
+            )
         },
     )
 
@@ -118,15 +122,19 @@ class DataTrainingArguments:
     max_train_samples: Optional[int] = field(
         default=None,
         metadata={
-            "help": "For debugging purposes or quicker training, truncate the number of training examples to this "
-            "value if set."
+            "help": (
+                "For debugging purposes or quicker training, truncate the number of training examples to this "
+                "value if set."
+            )
         },
     )
     max_eval_samples: Optional[int] = field(
         default=None,
         metadata={
-            "help": "For debugging purposes or quicker training, truncate the number of evaluation examples to this "
-            "value if set."
+            "help": (
+                "For debugging purposes or quicker training, truncate the number of evaluation examples to this "
+                "value if set."
+            )
         },
     )
     overwrite_cache: bool = field(
@@ -141,13 +149,12 @@ class DataTrainingArguments:
     block_size: Optional[int] = field(
         default=None,
         metadata={
-            "help": "Optional input sequence length after tokenization. "
-            "The training dataset will be truncated in block of this size for training. "
-            "Default to the model max input length for single sentence inputs (take into account special tokens)."
+            "help": (
+                "Optional input sequence length after tokenization. "
+                "The training dataset will be truncated in block of this size for training. "
+                "Default to the model max input length for single sentence inputs (take into account special tokens)."
+            )
         },
-    )
-    overwrite_cache: bool = field(
-        default=False, metadata={"help": "Overwrite the cached training and evaluation sets"}
     )
     preprocessing_num_workers: Optional[int] = field(
         default=None,
@@ -204,7 +211,7 @@ def write_eval_metric(summary_writer, eval_metrics, step):
 
 def create_learning_rate_fn(
     train_ds_size: int, train_batch_size: int, num_train_epochs: int, num_warmup_steps: int, learning_rate: float
-) -> Callable[[int], jnp.array]:
+) -> Callable[[int], jnp.ndarray]:
     """Returns a linear warmup, linear_decay learning rate function."""
     steps_per_epoch = train_ds_size // train_batch_size
     num_train_steps = steps_per_epoch * num_train_epochs
@@ -236,7 +243,7 @@ def main():
         and not training_args.overwrite_output_dir
     ):
         raise ValueError(
-            f"Output directory ({training_args.output_dir}) already exists and is not empty."
+            f"Output directory ({training_args.output_dir}) already exists and is not empty. "
             "Use --overwrite_output_dir to overcome."
         )
 
@@ -287,14 +294,15 @@ def main():
         data_files = {}
         if data_args.train_file is not None:
             data_files["train"] = data_args.train_file
+            extension = data_args.train_file.split(".")[-1]
         if data_args.validation_file is not None:
             data_files["validation"] = data_args.validation_file
-        extension = data_args.train_file.split(".")[-1]
+            extension = data_args.validation_file.split(".")[-1]
         if extension == "txt":
             extension = "text"
         dataset = load_dataset(extension, data_files=data_files, cache_dir=model_args.cache_dir)
     # See more about loading any type of standard or custom dataset (from files, python dict, pandas DataFrame, etc) at
-    # https://huggingface.co/docs/datasets/loading_datasets.html.
+    # https://huggingface.co/docs/datasets/loading_datasets.
 
     # Load pretrained config and tokenizer
     if model_args.config_name:
@@ -315,7 +323,7 @@ def main():
         )
     else:
         raise ValueError(
-            "You are instantiating a new tokenizer from scratch. This is not supported by this script."
+            "You are instantiating a new tokenizer from scratch. This is not supported by this script. "
             "You can do it from another script, save it, and load it from here, using --tokenizer_name."
         )
 
@@ -334,7 +342,8 @@ def main():
         # clm input could be much much longer than block_size
         if "Token indices sequence length is longer than the" in cl.out:
             tok_logger.warning(
-                "^^^^^^^^^^^^^^^^ Please ignore the warning above - this long input will be chunked into smaller bits before being passed to the model."
+                "^^^^^^^^^^^^^^^^ Please ignore the warning above - this long input will be chunked into smaller bits"
+                " before being passed to the model."
             )
         return output
 
@@ -351,13 +360,13 @@ def main():
         if block_size > config.max_position_embeddings:
             logger.warning(
                 f"The tokenizer picked seems to have a very large `model_max_length` ({tokenizer.model_max_length}). "
-                "Picking 1024 instead. You can change that default value by passing --block_size xxx."
+                f"Using block_size={min(1024, config.max_position_embeddings)} instead. You can change that default value by passing --block_size xxx."
             )
-            block_size = 1024
+            block_size = min(1024, config.max_position_embeddings)
     else:
         if data_args.block_size > tokenizer.model_max_length:
             logger.warning(
-                f"The block_size passed ({data_args.block_size}) is larger than the maximum length for the model"
+                f"The block_size passed ({data_args.block_size}) is larger than the maximum length for the model "
                 f"({tokenizer.model_max_length}). Using block_size={tokenizer.model_max_length}."
             )
         block_size = min(data_args.block_size, tokenizer.model_max_length)
@@ -384,7 +393,7 @@ def main():
     # to preprocess.
     #
     # To speed up this part, we use multiprocessing. See the documentation of the map method for more information:
-    # https://huggingface.co/docs/datasets/package_reference/main_classes.html#datasets.Dataset.map
+    # https://huggingface.co/docs/datasets/process#map
 
     lm_datasets = tokenized_datasets.map(
         group_texts,
@@ -398,14 +407,16 @@ def main():
             raise ValueError("--do_train requires a train dataset")
         train_dataset = lm_datasets["train"]
         if data_args.max_train_samples is not None:
-            train_dataset = train_dataset.select(range(data_args.max_train_samples))
+            max_train_samples = min(len(train_dataset), data_args.max_train_samples)
+            train_dataset = train_dataset.select(range(max_train_samples))
 
     if training_args.do_eval:
         if "validation" not in tokenized_datasets:
             raise ValueError("--do_eval requires a validation dataset")
         eval_dataset = lm_datasets["validation"]
         if data_args.max_eval_samples is not None:
-            eval_dataset = eval_dataset.select(range(data_args.max_eval_samples))
+            max_eval_samples = min(len(eval_dataset), data_args.max_eval_samples)
+            eval_dataset = eval_dataset.select(range(max_eval_samples))
 
     # Enable tensorboard only on the master node
     has_tensorboard = is_tensorboard_available()
@@ -468,7 +479,7 @@ def main():
     param_spec = set_partitions(unfreeze(model.params))
 
     # Get the PyTree for opt_state, we don't actually initialize the opt_state yet.
-    params_shapes = jax.tree_map(lambda x: x.shape, model.params)
+    params_shapes = jax.tree_util.tree_map(lambda x: x.shape, model.params)
     state_shapes = jax.eval_shape(get_initial_state, params_shapes)
 
     # get PartitionSpec for opt_state, this is very specific to adamw
@@ -479,7 +490,7 @@ def main():
             return param_spec
         return None
 
-    opt_state_spec, param_spec = jax.tree_map(
+    opt_state_spec, param_spec = jax.tree_util.tree_map(
         get_opt_spec, state_shapes, is_leaf=lambda x: isinstance(x, (dict, optax.EmptyState))
     )
 
@@ -493,7 +504,7 @@ def main():
 
     # hack: move the inital params to CPU to free up device memory
     # TODO: allow loading weights on CPU in pre-trained model
-    model.params = jax.tree_map(lambda x: np.asarray(x), model.params)
+    model.params = jax.tree_util.tree_map(lambda x: np.asarray(x), model.params)
 
     # mesh defination
     mesh_devices = np.array(jax.devices()).reshape(1, jax.local_device_count())
@@ -604,7 +615,8 @@ def main():
                         write_train_metric(summary_writer, train_metrics, train_time, cur_step)
 
                     epochs.write(
-                        f"Step... ({cur_step} | Loss: {train_metric['loss']}, Learning Rate: {train_metric['learning_rate']})"
+                        f"Step... ({cur_step} | Loss: {train_metric['loss']}, Learning Rate:"
+                        f" {train_metric['learning_rate']})"
                     )
 
                     train_metrics = []
@@ -622,7 +634,7 @@ def main():
 
                     # normalize eval metrics
                     eval_metrics = stack_forest(eval_metrics)
-                    eval_metrics = jax.tree_map(jnp.mean, eval_metrics)
+                    eval_metrics = jax.tree_util.tree_map(jnp.mean, eval_metrics)
 
                     try:
                         eval_metrics["perplexity"] = math.exp(eval_metrics["loss"])
@@ -630,7 +642,8 @@ def main():
                         eval_metrics["perplexity"] = float("inf")
 
                     logger.info(
-                        f"Step... ({cur_step} | Eval loss: {eval_metrics['loss']} | Eval Perplexity: {eval_metrics['perplexity']}"
+                        f"Step... ({cur_step} | Eval loss: {eval_metrics['loss']} | Eval Perplexity:"
+                        f" {eval_metrics['perplexity']}"
                     )
 
                 if cur_step % training_args.save_steps == 0 and cur_step > 0:

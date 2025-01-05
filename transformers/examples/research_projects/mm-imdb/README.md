@@ -1,16 +1,16 @@
 ## MM-IMDb
 
-Based on the script [`run_mmimdb.py`](https://github.com/huggingface/transformers/blob/master/examples/research_projects/mm-imdb/run_mmimdb.py).
+Based on the script [`run_mmimdb.py`](https://github.com/huggingface/transformers/blob/main/examples/research_projects/mm-imdb/run_mmimdb.py).
 
 [MM-IMDb](http://lisi1.unal.edu.co/mmimdb/) is a Multimodal dataset with around 26,000 movies including images, plots and other metadata.
 
 ### Training on MM-IMDb
 
-```
+```bash
 python run_mmimdb.py \
     --data_dir /path/to/mmimdb/dataset/ \
     --model_type bert \
-    --model_name_or_path bert-base-uncased \
+    --model_name_or_path google-bert/bert-base-uncased \
     --output_dir /path/to/save/dir/ \
     --do_train \
     --do_eval \

@@ -15,13 +15,14 @@
 """
 Speech processor class for Speech2Text
 """
+
+import warnings
 from contextlib import contextmanager
 
-from .feature_extraction_speech_to_text import Speech2TextFeatureExtractor
-from .tokenization_speech_to_text import Speech2TextTokenizer
+from ...processing_utils import ProcessorMixin
 
 
-class Speech2TextProcessor:
+class Speech2TextProcessor(ProcessorMixin):
     r"""
     Constructs a Speech2Text processor which wraps a Speech2Text feature extractor and a Speech2Text tokenizer into a
     single processor.
@@ -37,77 +38,13 @@ class Speech2TextProcessor:
             An instance of [`Speech2TextTokenizer`]. The tokenizer is a required input.
     """
 
+    feature_extractor_class = "Speech2TextFeatureExtractor"
+    tokenizer_class = "Speech2TextTokenizer"
+
     def __init__(self, feature_extractor, tokenizer):
-        if not isinstance(feature_extractor, Speech2TextFeatureExtractor):
-            raise ValueError(
-                f"`feature_extractor` has to be of type {Speech2TextFeatureExtractor.__class__}, but is {type(feature_extractor)}"
-            )
-        if not isinstance(tokenizer, Speech2TextTokenizer):
-            raise ValueError(
-                f"`tokenizer` has to be of type {Speech2TextTokenizer.__class__}, but is {type(tokenizer)}"
-            )
-
-        self.feature_extractor = feature_extractor
-        self.tokenizer = tokenizer
+        super().__init__(feature_extractor, tokenizer)
         self.current_processor = self.feature_extractor
-
-    def save_pretrained(self, save_directory):
-        """
-        Save a Speech2Text feature extractor object and Speech2Text tokenizer object to the directory `save_directory`,
-        so that it can be re-loaded using the [`~Speech2TextProcessor.from_pretrained`] class method.
-
-        <Tip>
-
-        This class method is simply calling [`~PreTrainedFeatureExtractor.save_pretrained`] and
-        [`~tokenization_utils_base.PreTrainedTokenizer.save_pretrained`]. Please refer to the docstrings of the methods
-        above for more information.
-
-        </Tip>
-
-        Args:
-            save_directory (`str` or `os.PathLike`):
-                Directory where the feature extractor JSON file and the tokenizer files will be saved (directory will
-                be created if it does not exist).
-        """
-        self.feature_extractor._set_processor_class(self.__class__.__name__)
-        self.feature_extractor.save_pretrained(save_directory)
-
-        self.tokenizer._set_processor_class(self.__class__.__name__)
-        self.tokenizer.save_pretrained(save_directory)
-
-    @classmethod
-    def from_pretrained(cls, pretrained_model_name_or_path, **kwargs):
-        r"""
-        Instantiate a [`Speech2TextProcessor`] from a pretrained Speech2Text processor.
-
-        <Tip>
-
-        This class method is simply calling Speech2TextFeatureExtractor's
-        [`~PreTrainedFeatureExtractor.from_pretrained`] and Speech2TextTokenizer's
-        [`~tokenization_utils_base.PreTrainedTokenizer.from_pretrained`]. Please refer to the docstrings of the methods
-        above for more information.
-
-        </Tip>
-
-        Args:
-            pretrained_model_name_or_path (`str` or `os.PathLike`):
-                This can be either:
-
-                - a string, the *model id* of a pretrained feature_extractor hosted inside a model repo on
-                  huggingface.co. Valid model ids can be located at the root-level, like `bert-base-uncased`, or
-                  namespaced under a user or organization name, like `dbmdz/bert-base-german-cased`.
-                - a path to a *directory* containing a feature extractor file saved using the
-                  [`~PreTrainedFeatureExtractor.save_pretrained`] method, e.g., `./my_model_directory/`.
-                - a path or url to a saved feature extractor JSON *file*, e.g.,
-                  `./my_model_directory/preprocessor_config.json`.
-            **kwargs
-                Additional keyword arguments passed along to both [`PreTrainedFeatureExtractor`] and
-                [`PreTrainedTokenizer`]
-        """
-        feature_extractor = Speech2TextFeatureExtractor.from_pretrained(pretrained_model_name_or_path, **kwargs)
-        tokenizer = Speech2TextTokenizer.from_pretrained(pretrained_model_name_or_path, **kwargs)
-
-        return cls(feature_extractor=feature_extractor, tokenizer=tokenizer)
+        self._in_target_context_manager = False
 
     def __call__(self, *args, **kwargs):
         """
@@ -117,7 +54,36 @@ class Speech2TextProcessor:
         [`~Speech2TextTokenizer.__call__`]. Please refer to the doctsring of the above two methods for more
         information.
         """
-        return self.current_processor(*args, **kwargs)
+        # For backward compatibility
+        if self._in_target_context_manager:
+            return self.current_processor(*args, **kwargs)
+
+        if "raw_speech" in kwargs:
+            warnings.warn("Using `raw_speech` as a keyword argument is deprecated. Use `audio` instead.")
+            audio = kwargs.pop("raw_speech")
+        else:
+            audio = kwargs.pop("audio", None)
+        sampling_rate = kwargs.pop("sampling_rate", None)
+        text = kwargs.pop("text", None)
+        if len(args) > 0:
+            audio = args[0]
+            args = args[1:]
+
+        if audio is None and text is None:
+            raise ValueError("You need to specify either an `audio` or `text` input to process.")
+
+        if audio is not None:
+            inputs = self.feature_extractor(audio, *args, sampling_rate=sampling_rate, **kwargs)
+        if text is not None:
+            encodings = self.tokenizer(text, **kwargs)
+
+        if text is None:
+            return inputs
+        elif audio is None:
+            return encodings
+        else:
+            inputs["labels"] = encodings["input_ids"]
+            return inputs
 
     def batch_decode(self, *args, **kwargs):
         """
@@ -139,6 +105,16 @@ class Speech2TextProcessor:
         Temporarily sets the tokenizer for processing the input. Useful for encoding the labels when fine-tuning
         Speech2Text.
         """
+        warnings.warn(
+            "`as_target_processor` is deprecated and will be removed in v5 of Transformers. You can process your "
+            "labels by using the argument `text` of the regular `__call__` method (either in the same call as "
+            "your audio inputs, or in a separate call."
+        )
+        self._in_target_context_manager = True
         self.current_processor = self.tokenizer
         yield
         self.current_processor = self.feature_extractor
+        self._in_target_context_manager = False
+
+
+__all__ = ["Speech2TextProcessor"]

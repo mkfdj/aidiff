@@ -1,12 +1,9 @@
-import base64
-import io
 from typing import Any, Dict, List, Union
 
 import numpy as np
 
-from ..file_utils import add_end_docstrings, is_torch_available, is_vision_available, requires_backends
-from ..utils import logging
-from .base import PIPELINE_INIT_ARGS, Pipeline
+from ..utils import add_end_docstrings, is_torch_available, is_vision_available, logging, requires_backends
+from .base import Pipeline, build_pipeline_init_args
 
 
 if is_vision_available():
@@ -15,9 +12,13 @@ if is_vision_available():
     from ..image_utils import load_image
 
 if is_torch_available():
-    import torch
+    from ..models.auto.modeling_auto import (
+        MODEL_FOR_IMAGE_SEGMENTATION_MAPPING_NAMES,
+        MODEL_FOR_INSTANCE_SEGMENTATION_MAPPING_NAMES,
+        MODEL_FOR_SEMANTIC_SEGMENTATION_MAPPING_NAMES,
+        MODEL_FOR_UNIVERSAL_SEGMENTATION_MAPPING_NAMES,
+    )
 
-    from ..models.auto.modeling_auto import MODEL_FOR_IMAGE_SEGMENTATION_MAPPING
 
 logger = logging.get_logger(__name__)
 
@@ -26,13 +27,37 @@ Prediction = Dict[str, Any]
 Predictions = List[Prediction]
 
 
-@add_end_docstrings(PIPELINE_INIT_ARGS)
+@add_end_docstrings(build_pipeline_init_args(has_image_processor=True))
 class ImageSegmentationPipeline(Pipeline):
     """
-    Image segmentation pipeline using any `AutoModelForImageSegmentation`. This pipeline predicts masks of objects and
+    Image segmentation pipeline using any `AutoModelForXXXSegmentation`. This pipeline predicts masks of objects and
     their classes.
 
-    This image segmntation pipeline can currently be loaded from [`pipeline`] using the following task identifier:
+    Example:
+
+    ```python
+    >>> from transformers import pipeline
+
+    >>> segmenter = pipeline(model="facebook/detr-resnet-50-panoptic")
+    >>> segments = segmenter("https://huggingface.co/datasets/Narsil/image_dummy/raw/main/parrots.png")
+    >>> len(segments)
+    2
+
+    >>> segments[0]["label"]
+    'bird'
+
+    >>> segments[1]["label"]
+    'bird'
+
+    >>> type(segments[0]["mask"])  # This is a black and white mask showing where is the bird on the original image.
+    <class 'PIL.Image.Image'>
+
+    >>> segments[0]["mask"].size
+    (768, 512)
+    ```
+
+
+    This image segmentation pipeline can currently be loaded from [`pipeline`] using the following task identifier:
     `"image-segmentation"`.
 
     See the list of available models on
@@ -46,22 +71,35 @@ class ImageSegmentationPipeline(Pipeline):
             raise ValueError(f"The {self.__class__} is only available in PyTorch.")
 
         requires_backends(self, "vision")
-        self.check_model_type(MODEL_FOR_IMAGE_SEGMENTATION_MAPPING)
+        mapping = MODEL_FOR_IMAGE_SEGMENTATION_MAPPING_NAMES.copy()
+        mapping.update(MODEL_FOR_SEMANTIC_SEGMENTATION_MAPPING_NAMES)
+        mapping.update(MODEL_FOR_INSTANCE_SEGMENTATION_MAPPING_NAMES)
+        mapping.update(MODEL_FOR_UNIVERSAL_SEGMENTATION_MAPPING_NAMES)
+        self.check_model_type(mapping)
 
     def _sanitize_parameters(self, **kwargs):
+        preprocess_kwargs = {}
         postprocess_kwargs = {}
+        if "subtask" in kwargs:
+            postprocess_kwargs["subtask"] = kwargs["subtask"]
+            preprocess_kwargs["subtask"] = kwargs["subtask"]
         if "threshold" in kwargs:
             postprocess_kwargs["threshold"] = kwargs["threshold"]
         if "mask_threshold" in kwargs:
             postprocess_kwargs["mask_threshold"] = kwargs["mask_threshold"]
-        return {}, {}, postprocess_kwargs
+        if "overlap_mask_area_threshold" in kwargs:
+            postprocess_kwargs["overlap_mask_area_threshold"] = kwargs["overlap_mask_area_threshold"]
+        if "timeout" in kwargs:
+            preprocess_kwargs["timeout"] = kwargs["timeout"]
 
-    def __call__(self, *args, **kwargs) -> Union[Predictions, List[Prediction]]:
+        return preprocess_kwargs, {}, postprocess_kwargs
+
+    def __call__(self, inputs=None, **kwargs) -> Union[Predictions, List[Prediction]]:
         """
         Perform segmentation (detect masks & classes) in the image(s) passed as inputs.
 
         Args:
-            images (`str`, `List[str]`, `PIL.Image` or `List[PIL.Image]`):
+            inputs (`str`, `List[str]`, `PIL.Image` or `List[PIL.Image]`):
                 The pipeline handles three types of images:
 
                 - A string containing an HTTP(S) link pointing to an image
@@ -70,31 +108,62 @@ class ImageSegmentationPipeline(Pipeline):
 
                 The pipeline accepts either a single image or a batch of images. Images in a batch must all be in the
                 same format: all as HTTP(S) links, all as local paths, or all as PIL images.
+            subtask (`str`, *optional*):
+                Segmentation task to be performed, choose [`semantic`, `instance` and `panoptic`] depending on model
+                capabilities. If not set, the pipeline will attempt tp resolve in the following order:
+                  `panoptic`, `instance`, `semantic`.
             threshold (`float`, *optional*, defaults to 0.9):
-                The probability necessary to make a prediction.
+                Probability threshold to filter out predicted masks.
             mask_threshold (`float`, *optional*, defaults to 0.5):
                 Threshold to use when turning the predicted masks into binary values.
+            overlap_mask_area_threshold (`float`, *optional*, defaults to 0.5):
+                Mask overlap threshold to eliminate small, disconnected segments.
+            timeout (`float`, *optional*, defaults to None):
+                The maximum time in seconds to wait for fetching images from the web. If None, no timeout is set and
+                the call may block forever.
 
         Return:
             A dictionary or a list of dictionaries containing the result. If the input is a single image, will return a
-            dictionary, if the input is a list of several images, will return a list of dictionaries corresponding to
-            each image.
+            list of dictionaries, if the input is a list of several images, will return a list of list of dictionaries
+            corresponding to each image.
 
-            The dictionaries contain the following keys:
+            The dictionaries contain the mask, label and score (where applicable) of each detected object and contains
+            the following keys:
 
             - **label** (`str`) -- The class label identified by the model.
-            - **score** (`float`) -- The score attributed by the model for that label.
-            - **mask** (`str`) -- base64 string of a grayscale (single-channel) PNG image that contain masks
-              information. The PNG image has size (heigth, width) of the original image. Pixel values in the image are
-              either 0 or 255 (i.e. mask is absent VS mask is present).
+            - **mask** (`PIL.Image`) -- A binary mask of the detected object as a Pil Image of shape (width, height) of
+              the original image. Returns a mask filled with zeros if no object is found.
+            - **score** (*optional* `float`) -- Optionally, when the model is capable of estimating a confidence of the
+              "object" described by the label and the mask.
         """
+        # After deprecation of this is completed, remove the default `None` value for `images`
+        if "images" in kwargs:
+            inputs = kwargs.pop("images")
+        if inputs is None:
+            raise ValueError("Cannot call the image-classification pipeline without an inputs argument!")
+        return super().__call__(inputs, **kwargs)
 
-        return super().__call__(*args, **kwargs)
-
-    def preprocess(self, image):
-        image = load_image(image)
-        target_size = torch.IntTensor([[image.height, image.width]])
-        inputs = self.feature_extractor(images=[image], return_tensors="pt")
+    def preprocess(self, image, subtask=None, timeout=None):
+        image = load_image(image, timeout=timeout)
+        target_size = [(image.height, image.width)]
+        if self.model.config.__class__.__name__ == "OneFormerConfig":
+            if subtask is None:
+                kwargs = {}
+            else:
+                kwargs = {"task_inputs": [subtask]}
+            inputs = self.image_processor(images=[image], return_tensors="pt", **kwargs)
+            if self.framework == "pt":
+                inputs = inputs.to(self.torch_dtype)
+            inputs["task_inputs"] = self.tokenizer(
+                inputs["task_inputs"],
+                padding="max_length",
+                max_length=self.model.config.task_seq_len,
+                return_tensors=self.framework,
+            )["input_ids"]
+        else:
+            inputs = self.image_processor(images=[image], return_tensors="pt")
+            if self.framework == "pt":
+                inputs = inputs.to(self.torch_dtype)
         inputs["target_size"] = target_size
         return inputs
 
@@ -104,40 +173,48 @@ class ImageSegmentationPipeline(Pipeline):
         model_outputs["target_size"] = target_size
         return model_outputs
 
-    def postprocess(self, model_outputs, threshold=0.9, mask_threshold=0.5):
-        raw_annotations = self.feature_extractor.post_process_segmentation(
-            model_outputs, model_outputs["target_size"], threshold=threshold, mask_threshold=0.5
-        )
-        raw_annotation = raw_annotations[0]
+    def postprocess(
+        self, model_outputs, subtask=None, threshold=0.9, mask_threshold=0.5, overlap_mask_area_threshold=0.5
+    ):
+        fn = None
+        if subtask in {"panoptic", None} and hasattr(self.image_processor, "post_process_panoptic_segmentation"):
+            fn = self.image_processor.post_process_panoptic_segmentation
+        elif subtask in {"instance", None} and hasattr(self.image_processor, "post_process_instance_segmentation"):
+            fn = self.image_processor.post_process_instance_segmentation
 
-        raw_annotation["masks"] *= 255  # [0,1] -> [0,255] black and white pixels
+        if fn is not None:
+            outputs = fn(
+                model_outputs,
+                threshold=threshold,
+                mask_threshold=mask_threshold,
+                overlap_mask_area_threshold=overlap_mask_area_threshold,
+                target_sizes=model_outputs["target_size"],
+            )[0]
 
-        raw_annotation["scores"] = raw_annotation["scores"].tolist()
-        raw_annotation["labels"] = [self.model.config.id2label[label.item()] for label in raw_annotation["labels"]]
-        raw_annotation["masks"] = [self._get_mask_str(mask) for mask in raw_annotation["masks"].cpu().numpy()]
+            annotation = []
+            segmentation = outputs["segmentation"]
 
-        # {"scores": [...], ...} --> [{"score":x, ...}, ...]
-        keys = ["score", "label", "mask"]
-        annotation = [
-            dict(zip(keys, vals))
-            for vals in zip(raw_annotation["scores"], raw_annotation["labels"], raw_annotation["masks"])
-        ]
+            for segment in outputs["segments_info"]:
+                mask = (segmentation == segment["id"]) * 255
+                mask = Image.fromarray(mask.numpy().astype(np.uint8), mode="L")
+                label = self.model.config.id2label[segment["label_id"]]
+                score = segment["score"]
+                annotation.append({"score": score, "label": label, "mask": mask})
 
+        elif subtask in {"semantic", None} and hasattr(self.image_processor, "post_process_semantic_segmentation"):
+            outputs = self.image_processor.post_process_semantic_segmentation(
+                model_outputs, target_sizes=model_outputs["target_size"]
+            )[0]
+
+            annotation = []
+            segmentation = outputs.numpy()
+            labels = np.unique(segmentation)
+
+            for label in labels:
+                mask = (segmentation == label) * 255
+                mask = Image.fromarray(mask.astype(np.uint8), mode="L")
+                label = self.model.config.id2label[label]
+                annotation.append({"score": None, "label": label, "mask": mask})
+        else:
+            raise ValueError(f"Subtask {subtask} is not supported for model {type(self.model)}")
         return annotation
-
-    def _get_mask_str(self, mask: np.array) -> str:
-        """
-        Turns mask numpy array into mask base64 str.
-
-        Args:
-            mask (`np.array`): Numpy array (with shape (heigth, width) of the original image) containing masks
-                information. Values in the array are either 0 or 255 (i.e. mask is absent VS mask is present).
-
-        Returns:
-            A base64 string of a single-channel PNG image that contain masks information.
-        """
-        img = Image.fromarray(mask.astype(np.int8), mode="L")
-        with io.BytesIO() as out:
-            img.save(out, format="PNG")
-            png_string = out.getvalue()
-            return base64.b64encode(png_string).decode("utf-8")

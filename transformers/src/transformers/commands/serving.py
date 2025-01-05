@@ -122,7 +122,6 @@ class ServeCommand(BaseTransformersCLICommand):
         serve_parser.set_defaults(func=serve_command_factory)
 
     def __init__(self, pipeline: Pipeline, host: str, port: int, workers: int):
-
         self._pipeline = pipeline
 
         self.host = host
@@ -131,9 +130,9 @@ class ServeCommand(BaseTransformersCLICommand):
 
         if not _serve_dependencies_installed:
             raise RuntimeError(
-                "Using serve command requires FastAPI and unicorn. "
-                'Please install transformers with [serving]: pip install "transformers[serving]".'
-                "Or install FastAPI and unicorn separately."
+                "Using serve command requires FastAPI and uvicorn. "
+                'Please install transformers with [serving]: pip install "transformers[serving]". '
+                "Or install FastAPI and uvicorn separately."
             )
         else:
             logger.info(f"Serving model over {host}:{port}")

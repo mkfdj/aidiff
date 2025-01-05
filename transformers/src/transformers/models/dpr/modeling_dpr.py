@@ -12,8 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-""" PyTorch DPR model for Open Domain Question Answering."""
-
+"""PyTorch DPR model for Open Domain Question Answering."""
 
 from dataclasses import dataclass
 from typing import Optional, Tuple, Union
@@ -21,16 +20,16 @@ from typing import Optional, Tuple, Union
 import torch
 from torch import Tensor, nn
 
-from ...file_utils import (
+from ...modeling_outputs import BaseModelOutputWithPooling
+from ...modeling_utils import PreTrainedModel
+from ...utils import (
     ModelOutput,
     add_start_docstrings,
     add_start_docstrings_to_model_forward,
+    logging,
     replace_return_docstrings,
 )
-from ...modeling_outputs import BaseModelOutputWithPooling
-from ...modeling_utils import PreTrainedModel
-from ...utils import logging
-from ..bert.modeling_bert import BertEncoder, BertModel
+from ..bert.modeling_bert import BertModel
 from .configuration_dpr import DPRConfig
 
 
@@ -38,19 +37,6 @@ logger = logging.get_logger(__name__)
 
 _CONFIG_FOR_DOC = "DPRConfig"
 _CHECKPOINT_FOR_DOC = "facebook/dpr-ctx_encoder-single-nq-base"
-
-DPR_CONTEXT_ENCODER_PRETRAINED_MODEL_ARCHIVE_LIST = [
-    "facebook/dpr-ctx_encoder-single-nq-base",
-    "facebook/dpr-ctx_encoder-multiset-base",
-]
-DPR_QUESTION_ENCODER_PRETRAINED_MODEL_ARCHIVE_LIST = [
-    "facebook/dpr-question_encoder-single-nq-base",
-    "facebook/dpr-question_encoder-multiset-base",
-]
-DPR_READER_PRETRAINED_MODEL_ARCHIVE_LIST = [
-    "facebook/dpr-reader-single-nq-base",
-    "facebook/dpr-reader-multiset-base",
-]
 
 
 ##########
@@ -82,8 +68,8 @@ class DPRContextEncoderOutput(ModelOutput):
     """
 
     pooler_output: torch.FloatTensor
-    hidden_states: Optional[Tuple[torch.FloatTensor]] = None
-    attentions: Optional[Tuple[torch.FloatTensor]] = None
+    hidden_states: Optional[Tuple[torch.FloatTensor, ...]] = None
+    attentions: Optional[Tuple[torch.FloatTensor, ...]] = None
 
 
 @dataclass
@@ -110,8 +96,8 @@ class DPRQuestionEncoderOutput(ModelOutput):
     """
 
     pooler_output: torch.FloatTensor
-    hidden_states: Optional[Tuple[torch.FloatTensor]] = None
-    attentions: Optional[Tuple[torch.FloatTensor]] = None
+    hidden_states: Optional[Tuple[torch.FloatTensor, ...]] = None
+    attentions: Optional[Tuple[torch.FloatTensor, ...]] = None
 
 
 @dataclass
@@ -143,11 +129,13 @@ class DPRReaderOutput(ModelOutput):
     start_logits: torch.FloatTensor
     end_logits: torch.FloatTensor = None
     relevance_logits: torch.FloatTensor = None
-    hidden_states: Optional[Tuple[torch.FloatTensor]] = None
-    attentions: Optional[Tuple[torch.FloatTensor]] = None
+    hidden_states: Optional[Tuple[torch.FloatTensor, ...]] = None
+    attentions: Optional[Tuple[torch.FloatTensor, ...]] = None
 
 
 class DPRPreTrainedModel(PreTrainedModel):
+    _supports_sdpa = True
+
     def _init_weights(self, module):
         """Initialize the weights"""
         if isinstance(module, nn.Linear):
@@ -164,19 +152,15 @@ class DPRPreTrainedModel(PreTrainedModel):
             module.bias.data.zero_()
             module.weight.data.fill_(1.0)
 
-    def _set_gradient_checkpointing(self, module, value=False):
-        if isinstance(module, BertEncoder):
-            module.gradient_checkpointing = value
-
 
 class DPREncoder(DPRPreTrainedModel):
-
     base_model_prefix = "bert_model"
 
     def __init__(self, config: DPRConfig):
         super().__init__(config)
         self.bert_model = BertModel(config, add_pooling_layer=False)
-        assert self.bert_model.config.hidden_size > 0, "Encoder hidden_size can't be zero"
+        if self.bert_model.config.hidden_size <= 0:
+            raise ValueError("Encoder hidden_size can't be zero")
         self.projection_dim = config.projection_dim
         if self.projection_dim > 0:
             self.encode_proj = nn.Linear(self.bert_model.config.hidden_size, config.projection_dim)
@@ -226,7 +210,6 @@ class DPREncoder(DPRPreTrainedModel):
 
 
 class DPRSpanPredictor(DPRPreTrainedModel):
-
     base_model_prefix = "encoder"
 
     def __init__(self, config: DPRConfig):
@@ -297,7 +280,6 @@ class DPRPretrainedContextEncoder(DPRPreTrainedModel):
     config_class = DPRConfig
     load_tf_weights = None
     base_model_prefix = "ctx_encoder"
-    _keys_to_ignore_on_load_missing = [r"position_ids"]
 
 
 class DPRPretrainedQuestionEncoder(DPRPreTrainedModel):
@@ -309,7 +291,6 @@ class DPRPretrainedQuestionEncoder(DPRPreTrainedModel):
     config_class = DPRConfig
     load_tf_weights = None
     base_model_prefix = "question_encoder"
-    _keys_to_ignore_on_load_missing = [r"position_ids"]
 
 
 class DPRPretrainedReader(DPRPreTrainedModel):
@@ -321,7 +302,6 @@ class DPRPretrainedReader(DPRPreTrainedModel):
     config_class = DPRConfig
     load_tf_weights = None
     base_model_prefix = "span_predictor"
-    _keys_to_ignore_on_load_missing = [r"position_ids"]
 
 
 ###############
@@ -368,7 +348,7 @@ DPR_ENCODERS_INPUTS_DOCSTRING = r"""
             DPR is a model with absolute position embeddings so it's usually advised to pad the inputs on the right
             rather than the left.
 
-            Indices can be obtained using [`DPRTokenizer`]. See [`PreTrainedTokenizer.encode`] and
+            Indices can be obtained using [`AutoTokenizer`]. See [`PreTrainedTokenizer.encode`] and
             [`PreTrainedTokenizer.__call__`] for details.
 
             [What are input IDs?](../glossary#input-ids)
@@ -398,12 +378,12 @@ DPR_ENCODERS_INPUTS_DOCSTRING = r"""
             Whether or not to return the hidden states of all layers. See `hidden_states` under returned tensors for
             more detail.
         return_dict (`bool`, *optional*):
-            Whether or not to return a [`~file_utils.ModelOutput`] instead of a plain tuple.
+            Whether or not to return a [`~utils.ModelOutput`] instead of a plain tuple.
 """
 
 DPR_READER_INPUTS_DOCSTRING = r"""
     Args:
-        input_ids: (`Tuple[torch.LongTensor]` of shapes `(n_passages, sequence_length)`):
+        input_ids (`Tuple[torch.LongTensor]` of shapes `(n_passages, sequence_length)`):
             Indices of input sequence tokens in the vocabulary. It has to be a sequence triplet with 1) the question
             and 2) the passages titles and 3) the passages texts To match pretraining, DPR `input_ids` sequence should
             be formatted with [CLS] and [SEP] with the format:
@@ -434,7 +414,7 @@ DPR_READER_INPUTS_DOCSTRING = r"""
             Whether or not to return the hidden states of all layers. See `hidden_states` under returned tensors for
             more detail.
         return_dict (`bool`, *optional*):
-            Whether or not to return a [`~file_utils.ModelOutput`] instead of a plain tuple.
+            Whether or not to return a [`~utils.ModelOutput`] instead of a plain tuple.
 """
 
 
@@ -458,9 +438,9 @@ class DPRContextEncoder(DPRPretrainedContextEncoder):
         attention_mask: Optional[Tensor] = None,
         token_type_ids: Optional[Tensor] = None,
         inputs_embeds: Optional[Tensor] = None,
-        output_attentions=None,
-        output_hidden_states=None,
-        return_dict=None,
+        output_attentions: Optional[bool] = None,
+        output_hidden_states: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
     ) -> Union[DPRContextEncoderOutput, Tuple[Tensor, ...]]:
         r"""
         Return:
@@ -539,9 +519,9 @@ class DPRQuestionEncoder(DPRPretrainedQuestionEncoder):
         attention_mask: Optional[Tensor] = None,
         token_type_ids: Optional[Tensor] = None,
         inputs_embeds: Optional[Tensor] = None,
-        output_attentions=None,
-        output_hidden_states=None,
-        return_dict=None,
+        output_attentions: Optional[bool] = None,
+        output_hidden_states: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
     ) -> Union[DPRQuestionEncoderOutput, Tuple[Tensor, ...]]:
         r"""
         Return:
@@ -566,6 +546,7 @@ class DPRQuestionEncoder(DPRPretrainedQuestionEncoder):
         if input_ids is not None and inputs_embeds is not None:
             raise ValueError("You cannot specify both input_ids and inputs_embeds at the same time")
         elif input_ids is not None:
+            self.warn_if_padding_and_no_attention_mask(input_ids, attention_mask)
             input_shape = input_ids.size()
         elif inputs_embeds is not None:
             input_shape = inputs_embeds.size()[:-1]
@@ -619,9 +600,9 @@ class DPRReader(DPRPretrainedReader):
         input_ids: Optional[Tensor] = None,
         attention_mask: Optional[Tensor] = None,
         inputs_embeds: Optional[Tensor] = None,
-        output_attentions: bool = None,
-        output_hidden_states: bool = None,
-        return_dict=None,
+        output_attentions: Optional[bool] = None,
+        output_hidden_states: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
     ) -> Union[DPRReaderOutput, Tuple[Tensor, ...]]:
         r"""
         Return:
@@ -654,6 +635,7 @@ class DPRReader(DPRPretrainedReader):
         if input_ids is not None and inputs_embeds is not None:
             raise ValueError("You cannot specify both input_ids and inputs_embeds at the same time")
         elif input_ids is not None:
+            self.warn_if_padding_and_no_attention_mask(input_ids, attention_mask)
             input_shape = input_ids.size()
         elif inputs_embeds is not None:
             input_shape = inputs_embeds.size()[:-1]
@@ -673,3 +655,14 @@ class DPRReader(DPRPretrainedReader):
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
         )
+
+
+__all__ = [
+    "DPRContextEncoder",
+    "DPRPretrainedContextEncoder",
+    "DPRPreTrainedModel",
+    "DPRPretrainedQuestionEncoder",
+    "DPRPretrainedReader",
+    "DPRQuestionEncoder",
+    "DPRReader",
+]

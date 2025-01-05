@@ -15,20 +15,18 @@
 import importlib.util
 import json
 import os
-import torch_xla.core.xla_model as xm
 import warnings
 from dataclasses import dataclass, field
 
 import torch
 
-from transformers.file_utils import cached_property, is_sagemaker_dp_enabled
-from transformers.training_args import TrainingArguments
-from transformers.utils import logging
+from ..training_args import TrainingArguments
+from ..utils import cached_property, is_sagemaker_dp_enabled, logging
 
 
 logger = logging.get_logger(__name__)
 
-# TODO: should be moved to `file_utils` after refactoring of SageMakerTrainer
+# TODO: should be moved to `utils` after refactoring of SageMakerTrainer
 
 
 def is_sagemaker_model_parallel_available():
@@ -79,19 +77,24 @@ class SageMakerTrainingArguments(TrainingArguments):
     @cached_property
     def _setup_devices(self) -> "torch.device":
         logger.info("PyTorch: setting up devices")
+        if torch.distributed.is_available() and torch.distributed.is_initialized() and self.local_rank == -1:
+            logger.warning(
+                "torch.distributed process group is initialized, but local_rank == -1. "
+                "In order to use Torch DDP, launch your script with `python -m torch.distributed.launch"
+            )
         if self.no_cuda:
             device = torch.device("cpu")
             self._n_gpu = 0
         elif is_sagemaker_model_parallel_available():
             local_rank = smp.local_rank()
-            device = torch.device("xm.xla_device()", local_rank)
+            device = torch.device("cuda", local_rank)
             self._n_gpu = 1
         elif is_sagemaker_dp_enabled():
-            import smdistributed.dataparallel.torch.distributed as dist
+            import smdistributed.dataparallel.torch.torch_smddp  # noqa: F401
 
-            dist.init_process_group()
-            self.local_rank = dist.get_local_rank()
-            device = torch.device("xm.xla_device()", self.local_rank)
+            torch.distributed.init_process_group(backend="smddp", timeout=self.ddp_timeout_delta)
+            self.local_rank = int(os.getenv("SMDATAPARALLEL_LOCAL_RANK"))
+            device = torch.device("cuda", self.local_rank)
             self._n_gpu = 1
         elif self.local_rank == -1:
             # if n_gpu is > 1 we'll use nn.DataParallel.
@@ -100,19 +103,20 @@ class SageMakerTrainingArguments(TrainingArguments):
             # trigger an error that a device index is missing. Index 0 takes into account the
             # GPUs available in the environment, so `CUDA_VISIBLE_DEVICES=1,2` with `cuda:0`
             # will use the first GPU in that env, i.e. GPU#1
-            device = torch.device("xm.xla_device()" if torch.to(xm.xla_device()).is_available() else "cpu")
+            device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
             # Sometimes the line in the postinit has not been run before we end up here, so just checking we're not at
             # the default value.
-            self._n_gpu = torch.to(xm.xla_device()).device_count()
+            self._n_gpu = torch.cuda.device_count()
         else:
             # Here, we'll use torch.distributed.
             # Initializes the distributed backend which will take care of synchronizing nodes/GPUs
-            torch.distributed.init_process_group(backend="nccl")
-            device = torch.device("xm.xla_device()", self.local_rank)
+            if not torch.distributed.is_initialized():
+                torch.distributed.init_process_group(backend="nccl", timeout=self.ddp_timeout_delta)
+            device = torch.device("cuda", self.local_rank)
             self._n_gpu = 1
 
-        if device.type == "xm.xla_device()":
-            torch.to(xm.xla_device()).set_device(device)
+        if device.type == "cuda":
+            torch.cuda.set_device(device)
 
         return device
 

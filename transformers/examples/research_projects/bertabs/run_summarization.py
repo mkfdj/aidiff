@@ -3,14 +3,13 @@ import argparse
 import logging
 import os
 import sys
-import torch_xla.core.xla_model as xm
 from collections import namedtuple
 
 import torch
+from modeling_bertabs import BertAbs, build_predictor
 from torch.utils.data import DataLoader, SequentialSampler
 from tqdm import tqdm
 
-from modeling_bertabs import BertAbs, build_predictor
 from transformers import BertTokenizer
 
 from .utils_summarization import (
@@ -30,7 +29,7 @@ Batch = namedtuple("Batch", ["document_names", "batch_size", "src", "segs", "mas
 
 
 def evaluate(args):
-    tokenizer = BertTokenizer.from_pretrained("bert-base-uncased", do_lower_case=True)
+    tokenizer = BertTokenizer.from_pretrained("google-bert/bert-base-uncased", do_lower_case=True)
     model = BertAbs.from_pretrained("remi/bertabs-finetuned-extractive-abstractive-summarization")
     model.to(args.device)
     model.eval()
@@ -46,7 +45,6 @@ def evaluate(args):
         generated_summaries = []
 
         import nltk
-
         import rouge
 
         nltk.download("punkt")
@@ -318,7 +316,7 @@ def main():
     args = parser.parse_args()
 
     # Select device (distibuted not available)
-    args.device = torch.device("cuda" if torch.to(xm.xla_device()).is_available() and not args.no_cuda else "cpu")
+    args.device = torch.device("cuda" if torch.cuda.is_available() and not args.no_cuda else "cpu")
 
     # Check the existence of directories
     if not args.summaries_output_dir:
@@ -326,7 +324,8 @@ def main():
 
     if not documents_dir_is_valid(args.documents_dir):
         raise FileNotFoundError(
-            "We could not find the directory you specified for the documents to summarize, or it was empty. Please specify a valid path."
+            "We could not find the directory you specified for the documents to summarize, or it was empty. Please"
+            " specify a valid path."
         )
     os.makedirs(args.summaries_output_dir, exist_ok=True)
 

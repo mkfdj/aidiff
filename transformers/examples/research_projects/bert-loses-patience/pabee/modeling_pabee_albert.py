@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""PyTorch ALBERT model with Patience-based Early Exit. """
+"""PyTorch ALBERT model with Patience-based Early Exit."""
 
 import logging
 
@@ -84,7 +84,10 @@ class AlbertModelWithPabee(AlbertModel):
 
     def log_stats(self):
         avg_inf_layers = self.inference_layers_num / self.inference_instances_num
-        message = f"*** Patience = {self.patience} Avg. Inference Layers = {avg_inf_layers:.2f} Speed Up = {1 - avg_inf_layers / self.config.num_hidden_layers:.2f} ***"
+        message = (
+            f"*** Patience = {self.patience} Avg. Inference Layers = {avg_inf_layers:.2f} Speed Up ="
+            f" {1 - avg_inf_layers / self.config.num_hidden_layers:.2f} ***"
+        )
         print(message)
 
     @add_start_docstrings_to_model_forward(ALBERT_INPUTS_DOCSTRING)
@@ -250,7 +253,7 @@ class AlbertForSequenceClassificationWithPabee(AlbertPreTrainedModel):
 
         Returns:
             :obj:`tuple(torch.FloatTensor)` comprising various elements depending on the configuration (:class:`~transformers.AlbertConfig`) and inputs:
-            loss: (`optional`, returned when ``labels`` is provided) ``torch.FloatTensor`` of shape ``(1,)``:
+            loss (`optional`, returned when ``labels`` is provided) ``torch.FloatTensor`` of shape ``(1,)``:
                 Classification (or regression if config.num_labels==1) loss.
             logits ``torch.FloatTensor`` of shape ``(batch_size, config.num_labels)``
                 Classification (or regression if config.num_labels==1) scores (before SoftMax).
@@ -273,8 +276,8 @@ class AlbertForSequenceClassificationWithPabee(AlbertPreTrainedModel):
                 from torch import nn
                 import torch
 
-                tokenizer = AlbertTokenizer.from_pretrained('albert-base-v2')
-                model = AlbertForSequenceClassificationWithPabee.from_pretrained('albert-base-v2')
+                tokenizer = AlbertTokenizer.from_pretrained('albert/albert-base-v2')
+                model = AlbertForSequenceClassificationWithPabee.from_pretrained('albert/albert-base-v2')
                 input_ids = torch.tensor(tokenizer.encode("Hello, my dog is cute")).unsqueeze(0)  # Batch size 1
                 labels = torch.tensor([1]).unsqueeze(0)  # Batch size 1
                 outputs = model(input_ids, labels=labels)

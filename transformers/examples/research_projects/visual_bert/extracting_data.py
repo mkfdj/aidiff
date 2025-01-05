@@ -9,9 +9,9 @@ from collections import OrderedDict
 import datasets
 import numpy as np
 import torch
-
 from modeling_frcnn import GeneralizedRCNN
 from processing_image import Preprocess
+
 from utils import Config
 
 
@@ -61,12 +61,12 @@ class Extract:
         assert outputfile is not None and not os.path.isfile(outputfile), f"{outputfile}"
         if subset_list is not None:
             with open(os.path.realpath(subset_list)) as f:
-                self.subset_list = set(map(lambda x: self._vqa_file_split()[0], tryload(f)))
+                self.subset_list = {self._vqa_file_split()[0] for x in tryload(f)}
         else:
             self.subset_list = None
 
         self.config = CONFIG
-        if torch.to(xm.xla_device()).is_available():
+        if torch.cuda.is_available():
             self.config.model.device = "cuda"
         self.inputdir = os.path.realpath(inputdir)
         self.outputfile = os.path.realpath(outputfile)

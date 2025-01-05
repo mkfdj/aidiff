@@ -16,7 +16,7 @@ limitations under the License.
 
 # Question Answering examples
 
-Based on the script [`run_qa.py`](https://github.com/huggingface/transformers/blob/master/examples/flax/question-answering/run_qa.py).
+Based on the script [`run_qa.py`](https://github.com/huggingface/transformers/blob/main/examples/flax/question-answering/run_qa.py).
 
 **Note:** This script only works with models that have a fast tokenizer (backed by the 🤗 Tokenizers library) as it
 uses special features of those tokenizers. You can check if your favorite model has a fast tokenizer in
@@ -29,7 +29,7 @@ The following example fine-tunes BERT on SQuAD:
 
 ```bash
 python run_qa.py \
-  --model_name_or_path bert-base-uncased \
+  --model_name_or_path google-bert/bert-base-uncased \
   --dataset_name squad \
   --do_train   \
   --do_eval   \
@@ -67,7 +67,7 @@ Here is an example training on 4 TITAN RTX GPUs and Bert Whole Word Masking unca
 ```bash
 export CUDA_VISIBLE_DEVICES=0,1,2,3
 python run_qa.py   \
---model_name_or_path bert-large-uncased-whole-word-masking   \
+--model_name_or_path google-bert/bert-large-uncased-whole-word-masking   \
 --dataset_name squad   \
 --do_train   \
 --do_eval   \

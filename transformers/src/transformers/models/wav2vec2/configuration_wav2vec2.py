@@ -12,18 +12,16 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-""" Wav2Vec2 model configuration"""
+"""Wav2Vec2 model configuration"""
+
+import functools
+import operator
 
 from ...configuration_utils import PretrainedConfig
 from ...utils import logging
 
 
 logger = logging.get_logger(__name__)
-
-WAV_2_VEC_2_PRETRAINED_CONFIG_ARCHIVE_MAP = {
-    "facebook/wav2vec2-base-960h": "https://huggingface.co/facebook/wav2vec2-base-960h/resolve/main/config.json",
-    # See all Wav2Vec2 models at https://huggingface.co/models?filter=wav2vec2
-}
 
 
 class Wav2Vec2Config(PretrainedConfig):
@@ -56,10 +54,15 @@ class Wav2Vec2Config(PretrainedConfig):
             `"relu"`, `"selu"` and `"gelu_new"` are supported.
         hidden_dropout (`float`, *optional*, defaults to 0.1):
             The dropout probability for all fully connected layers in the embeddings, encoder, and pooler.
+        activation_dropout (`float`, *optional*, defaults to 0.1):
+            The dropout ratio for activations inside the fully connected layer.
         attention_dropout (`float`, *optional*, defaults to 0.1):
             The dropout ratio for the attention probabilities.
         final_dropout (`float`, *optional*, defaults to 0.1):
             The dropout probability for the final projection layer of [`Wav2Vec2ForCTC`].
+        layerdrop (`float`, *optional*, defaults to 0.1):
+            The LayerDrop probability. See the [LayerDrop paper](see https://arxiv.org/abs/1909.11556) for more
+            details.
         initializer_range (`float`, *optional*, defaults to 0.02):
             The standard deviation of the truncated_normal_initializer for initializing all weight matrices.
         layer_norm_eps (`float`, *optional*, defaults to 1e-12):
@@ -74,14 +77,14 @@ class Wav2Vec2Config(PretrainedConfig):
             The non-linear activation function (function or string) in the 1D convolutional layers of the feature
             extractor. If string, `"gelu"`, `"relu"`, `"selu"` and `"gelu_new"` are supported.
         feat_quantizer_dropout (`float`, *optional*, defaults to 0.0):
-            The dropout probabilitiy for quantized feature encoder states.
-        conv_dim (`Tuple[int]`, *optional*, defaults to `(512, 512, 512, 512, 512, 512, 512)`):
+            The dropout probability for quantized feature encoder states.
+        conv_dim (`Tuple[int]` or `List[int]`, *optional*, defaults to `(512, 512, 512, 512, 512, 512, 512)`):
             A tuple of integers defining the number of input and output channels of each 1D convolutional layer in the
             feature encoder. The length of *conv_dim* defines the number of 1D convolutional layers.
-        conv_stride (`Tuple[int]`, *optional*, defaults to `(5, 2, 2, 2, 2, 2, 2)`):
+        conv_stride (`Tuple[int]` or `List[int]`, *optional*, defaults to `(5, 2, 2, 2, 2, 2, 2)`):
             A tuple of integers defining the stride of each 1D convolutional layer in the feature encoder. The length
             of *conv_stride* defines the number of convolutional layers and has to match the length of *conv_dim*.
-        conv_kernel (`Tuple[int]`, *optional*, defaults to `(10, 3, 3, 3, 3, 3, 3)`):
+        conv_kernel (`Tuple[int]` or `List[int]`, *optional*, defaults to `(10, 3, 3, 3, 3, 3, 3)`):
             A tuple of integers defining the kernel size of each 1D convolutional layer in the feature encoder. The
             length of *conv_kernel* defines the number of convolutional layers and has to match the length of
             *conv_dim*.
@@ -132,7 +135,7 @@ class Wav2Vec2Config(PretrainedConfig):
         contrastive_logits_temperature (`float`, *optional*, defaults to 0.1):
             The temperature *kappa* in the contrastive loss.
         feat_quantizer_dropout (`float`, *optional*, defaults to 0.0):
-            The dropout probabilitiy for the output of the feature encoder that's used by the quantizer.
+            The dropout probability for the output of the feature encoder that's used by the quantizer.
         num_negatives (`int`, *optional*, defaults to 100):
             Number of negative samples for the contrastive loss.
         codevector_dim (`int`, *optional*, defaults to 256):
@@ -153,13 +156,13 @@ class Wav2Vec2Config(PretrainedConfig):
             instance of [`Wav2Vec2ForSequenceClassification`].
         classifier_proj_size (`int`, *optional*, defaults to 256):
             Dimensionality of the projection before token mean-pooling for classification.
-        tdnn_dim (`Tuple[int]`, *optional*, defaults to `(512, 512, 512, 512, 1500)`):
+        tdnn_dim (`Tuple[int]` or `List[int]`, *optional*, defaults to `(512, 512, 512, 512, 1500)`):
             A tuple of integers defining the number of output channels of each 1D convolutional layer in the *TDNN*
             module of the *XVector* model. The length of *tdnn_dim* defines the number of *TDNN* layers.
-        tdnn_kernel (`Tuple[int]`, *optional*, defaults to `(5, 3, 3, 1, 1)`):
+        tdnn_kernel (`Tuple[int]` or `List[int]`, *optional*, defaults to `(5, 3, 3, 1, 1)`):
             A tuple of integers defining the kernel size of each 1D convolutional layer in the *TDNN* module of the
             *XVector* model. The length of *tdnn_kernel* has to match the length of *tdnn_dim*.
-        tdnn_dilation (`Tuple[int]`, *optional*, defaults to `(1, 2, 3, 1, 1)`):
+        tdnn_dilation (`Tuple[int]` or `List[int]`, *optional*, defaults to `(1, 2, 3, 1, 1)`):
             A tuple of integers defining the dilation factor of each 1D convolutional layer in *TDNN* module of the
             *XVector* model. The length of *tdnn_dilation* has to match the length of *tdnn_dim*.
         xvector_output_dim (`int`, *optional*, defaults to 512):
@@ -174,6 +177,9 @@ class Wav2Vec2Config(PretrainedConfig):
         num_adapter_layers (`int`, *optional*, defaults to 3):
             Number of convolutional layers that should be used in the adapter network. Only relevant if `add_adapter is
             True`.
+        adapter_attn_dim (`int`, *optional*):
+            Dimension of the attention adapter weights to be used in each attention block. An example of a model using
+            attention adapters is [facebook/mms-1b-all](https://huggingface.co/facebook/mms-1b-all).
         output_hidden_size (`int`, *optional*):
             Dimensionality of the encoder output layer. If not defined, this defaults to *hidden-size*. Only relevant
             if `add_adapter is True`.
@@ -181,17 +187,18 @@ class Wav2Vec2Config(PretrainedConfig):
     Example:
 
     ```python
-    >>> from transformers import Wav2Vec2Model, Wav2Vec2Config
+    >>> from transformers import Wav2Vec2Config, Wav2Vec2Model
 
     >>> # Initializing a Wav2Vec2 facebook/wav2vec2-base-960h style configuration
     >>> configuration = Wav2Vec2Config()
 
-    >>> # Initializing a model from the facebook/wav2vec2-base-960h style configuration
+    >>> # Initializing a model (with random weights) from the facebook/wav2vec2-base-960h style configuration
     >>> model = Wav2Vec2Model(configuration)
 
     >>> # Accessing the model configuration
     >>> configuration = model.config
     ```"""
+
     model_type = "wav2vec2"
 
     def __init__(
@@ -250,7 +257,8 @@ class Wav2Vec2Config(PretrainedConfig):
         adapter_stride=2,
         num_adapter_layers=3,
         output_hidden_size=None,
-        **kwargs
+        adapter_attn_dim=None,
+        **kwargs,
     ):
         super().__init__(**kwargs, pad_token_id=pad_token_id, bos_token_id=bos_token_id, eos_token_id=eos_token_id)
         self.hidden_size = hidden_size
@@ -285,10 +293,10 @@ class Wav2Vec2Config(PretrainedConfig):
             or (len(self.conv_dim) != self.num_feat_extract_layers)
         ):
             raise ValueError(
-                "Configuration for convolutional layers is incorrect. "
-                "It is required that `len(config.conv_dim)` == `len(config.conv_stride)` == `len(config.conv_kernel)`, "
-                f"but is `len(config.conv_dim) = {len(self.conv_dim)}`, `len(config.conv_stride) "
-                f"= {len(self.conv_stride)}`, `len(config.conv_kernel) = {len(self.conv_kernel)}`."
+                "Configuration for convolutional layers is incorrect. It is required that `len(config.conv_dim)` =="
+                " `len(config.conv_stride)` == `len(config.conv_kernel)`, but is `len(config.conv_dim) ="
+                f" {len(self.conv_dim)}`, `len(config.conv_stride) = {len(self.conv_stride)}`,"
+                f" `len(config.conv_kernel) = {len(self.conv_kernel)}`."
             )
 
         # fine-tuning config parameters for SpecAugment: https://arxiv.org/abs/1904.08779
@@ -320,6 +328,7 @@ class Wav2Vec2Config(PretrainedConfig):
         self.adapter_stride = adapter_stride
         self.num_adapter_layers = num_adapter_layers
         self.output_hidden_size = output_hidden_size or hidden_size
+        self.adapter_attn_dim = adapter_attn_dim
 
         # SequenceClassification-specific parameter. Feel free to ignore for other classes.
         self.classifier_proj_size = classifier_proj_size
@@ -329,3 +338,10 @@ class Wav2Vec2Config(PretrainedConfig):
         self.tdnn_kernel = list(tdnn_kernel)
         self.tdnn_dilation = list(tdnn_dilation)
         self.xvector_output_dim = xvector_output_dim
+
+    @property
+    def inputs_to_logits_ratio(self):
+        return functools.reduce(operator.mul, self.conv_stride, 1)
+
+
+__all__ = ["Wav2Vec2Config"]

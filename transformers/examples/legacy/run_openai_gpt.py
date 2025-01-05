@@ -20,7 +20,7 @@
 
     This script with default values fine-tunes and evaluate a pretrained OpenAI GPT on the RocStories dataset:
         python run_openai_gpt.py \
-          --model_name openai-gpt \
+          --model_name openai-community/openai-gpt \
           --do_train \
           --do_eval \
           --train_dataset "$ROC_STORIES_DIR/cloze_test_val__spring2016 - cloze_test_ALL_val.csv" \
@@ -28,6 +28,7 @@
           --output_dir ../log \
           --train_batch_size 16 \
 """
+
 import argparse
 import csv
 import logging
@@ -36,7 +37,6 @@ import random
 
 import numpy as np
 import torch
-import torch_xla.core.xla_model as xm
 from torch.utils.data import DataLoader, RandomSampler, SequentialSampler, TensorDataset
 from tqdm import tqdm, trange
 
@@ -105,7 +105,7 @@ def pre_process_datasets(encoded_datasets, input_len, cap_length, start_token, d
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model_name", type=str, default="openai-gpt", help="pretrained model name")
+    parser.add_argument("--model_name", type=str, default="openai-community/openai-gpt", help="pretrained model name")
     parser.add_argument("--do_train", action="store_true", help="Whether to run training.")
     parser.add_argument("--do_eval", action="store_true", help="Whether to run eval on the dev set.")
     parser.add_argument(
@@ -127,15 +127,15 @@ def main():
         "--max_steps",
         default=-1,
         type=int,
-        help="If > 0: set total number of training \
-                        steps to perform. Override num_train_epochs.",
+        help=(
+            "If > 0: set total number of training                         steps to perform. Override num_train_epochs."
+        ),
     )
     parser.add_argument(
         "--gradient_accumulation_steps",
         type=int,
         default=1,
-        help="Number of updates steps to accumulate before\
-                        performing a backward/update pass.",
+        help="Number of updates steps to accumulate before                        performing a backward/update pass.",
     )
     parser.add_argument("--learning_rate", type=float, default=6.25e-5)
     parser.add_argument("--warmup_steps", default=0, type=int, help="Linear warmup over warmup_steps.")
@@ -160,10 +160,10 @@ def main():
     random.seed(args.seed)
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
-    torch.to(xm.xla_device()).manual_seed_all(args.seed)
-    device = xm.xla_device()  # Set the device to TPU
+    torch.cuda.manual_seed_all(args.seed)
 
-    n_gpu = torch.to(xm.xla_device()).device_count()
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    n_gpu = torch.cuda.device_count()
     logger.info("device: {}, n_gpu {}".format(device, n_gpu))
 
     if not args.do_train and not args.do_eval:
@@ -190,7 +190,7 @@ def main():
             return tokenizer.convert_tokens_to_ids(tokenizer.tokenize(obj))
         elif isinstance(obj, int):
             return obj
-        return list(tokenize_and_encode(o) for o in obj)
+        return [tokenize_and_encode(o) for o in obj]
 
     logger.info("Encoding dataset...")
     train_dataset = load_rocstories_dataset(args.train_dataset)

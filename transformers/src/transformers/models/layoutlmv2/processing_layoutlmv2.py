@@ -15,112 +15,56 @@
 """
 Processor class for LayoutLMv2.
 """
+
+import warnings
 from typing import List, Optional, Union
 
-from ...file_utils import TensorType
+from ...processing_utils import ProcessorMixin
 from ...tokenization_utils_base import BatchEncoding, PaddingStrategy, PreTokenizedInput, TextInput, TruncationStrategy
-from .feature_extraction_layoutlmv2 import LayoutLMv2FeatureExtractor
-from .tokenization_layoutlmv2 import LayoutLMv2Tokenizer
-from .tokenization_layoutlmv2_fast import LayoutLMv2TokenizerFast
+from ...utils import TensorType
 
 
-class LayoutLMv2Processor:
+class LayoutLMv2Processor(ProcessorMixin):
     r"""
-    Constructs a LayoutLMv2 processor which combines a LayoutLMv2 feature extractor and a LayoutLMv2 tokenizer into a
+    Constructs a LayoutLMv2 processor which combines a LayoutLMv2 image processor and a LayoutLMv2 tokenizer into a
     single processor.
 
     [`LayoutLMv2Processor`] offers all the functionalities you need to prepare data for the model.
 
-    It first uses [`LayoutLMv2FeatureExtractor`] to resize document images to a fixed size, and optionally applies OCR
-    to get words and normalized bounding boxes. These are then provided to [`LayoutLMv2Tokenizer`] or
+    It first uses [`LayoutLMv2ImageProcessor`] to resize document images to a fixed size, and optionally applies OCR to
+    get words and normalized bounding boxes. These are then provided to [`LayoutLMv2Tokenizer`] or
     [`LayoutLMv2TokenizerFast`], which turns the words and bounding boxes into token-level `input_ids`,
     `attention_mask`, `token_type_ids`, `bbox`. Optionally, one can provide integer `word_labels`, which are turned
     into token-level `labels` for token classification tasks (such as FUNSD, CORD).
 
     Args:
-        feature_extractor (`LayoutLMv2FeatureExtractor`):
-            An instance of [`LayoutLMv2FeatureExtractor`]. The feature extractor is a required input.
-        tokenizer (`LayoutLMv2Tokenizer` or `LayoutLMv2TokenizerFast`):
+        image_processor (`LayoutLMv2ImageProcessor`, *optional*):
+            An instance of [`LayoutLMv2ImageProcessor`]. The image processor is a required input.
+        tokenizer (`LayoutLMv2Tokenizer` or `LayoutLMv2TokenizerFast`, *optional*):
             An instance of [`LayoutLMv2Tokenizer`] or [`LayoutLMv2TokenizerFast`]. The tokenizer is a required input.
     """
 
-    def __init__(self, feature_extractor, tokenizer):
-        if not isinstance(feature_extractor, LayoutLMv2FeatureExtractor):
-            raise ValueError(
-                f"`feature_extractor` has to be of type {LayoutLMv2FeatureExtractor.__class__}, but is {type(feature_extractor)}"
+    attributes = ["image_processor", "tokenizer"]
+    image_processor_class = "LayoutLMv2ImageProcessor"
+    tokenizer_class = ("LayoutLMv2Tokenizer", "LayoutLMv2TokenizerFast")
+
+    def __init__(self, image_processor=None, tokenizer=None, **kwargs):
+        feature_extractor = None
+        if "feature_extractor" in kwargs:
+            warnings.warn(
+                "The `feature_extractor` argument is deprecated and will be removed in v5, use `image_processor`"
+                " instead.",
+                FutureWarning,
             )
-        if not isinstance(tokenizer, (LayoutLMv2Tokenizer, LayoutLMv2TokenizerFast)):
-            raise ValueError(
-                f"`tokenizer` has to be of type {LayoutLMv2Tokenizer.__class__} or {LayoutLMv2TokenizerFast.__class__}, but is {type(tokenizer)}"
-            )
+            feature_extractor = kwargs.pop("feature_extractor")
 
-        self.feature_extractor = feature_extractor
-        self.tokenizer = tokenizer
+        image_processor = image_processor if image_processor is not None else feature_extractor
+        if image_processor is None:
+            raise ValueError("You need to specify an `image_processor`.")
+        if tokenizer is None:
+            raise ValueError("You need to specify a `tokenizer`.")
 
-    def save_pretrained(self, save_directory):
-        """
-        Save a LayoutLMv2 feature_extractor object and LayoutLMv2 tokenizer object to the directory `save_directory`,
-        so that it can be re-loaded using the [`~LayoutLMv2Processor.from_pretrained`] class method.
-
-        <Tip>
-
-        This class method is simply calling [`~feature_extraction_utils.FeatureExtractionMixin.save_pretrained`] and
-        [`~tokenization_utils_base.PreTrainedTokenizer.save_pretrained`]. Please refer to the docstrings of the methods
-        above for more information.
-
-        </Tip>
-
-        Args:
-            save_directory (`str` or `os.PathLike`):
-                Directory where the feature extractor JSON file and the tokenizer files will be saved (directory will
-                be created if it does not exist).
-        """
-        self.feature_extractor._set_processor_class(self.__class__.__name__)
-        self.feature_extractor.save_pretrained(save_directory)
-
-        self.tokenizer._set_processor_class(self.__class__.__name__)
-        self.tokenizer.save_pretrained(save_directory)
-
-    @classmethod
-    def from_pretrained(cls, pretrained_model_name_or_path, use_fast=True, **kwargs):
-        r"""
-        Instantiate a [`LayoutLMv2Processor`] from a pretrained LayoutLMv2 processor.
-
-        <Tip>
-
-        This class method is simply calling LayoutLMv2FeatureExtractor's
-        [`~feature_extraction_utils.FeatureExtractionMixin.from_pretrained`] and LayoutLMv2TokenizerFast's
-        [`~tokenization_utils_base.PreTrainedTokenizer.from_pretrained`]. Please refer to the docstrings of the methods
-        above for more information.
-
-        </Tip>
-
-        Args:
-            pretrained_model_name_or_path (`str` or `os.PathLike`):
-                This can be either:
-
-                - a string, the *model id* of a pretrained feature_extractor hosted inside a model repo on
-                  huggingface.co. Valid model ids can be located at the root-level, like `bert-base-uncased`, or
-                  namespaced under a user or organization name, like `dbmdz/bert-base-german-cased`.
-                - a path to a *directory* containing a feature extractor file saved using the
-                  [`~SequenceFeatureExtractor.save_pretrained`] method, e.g., `./my_model_directory/`.
-                - a path or url to a saved feature extractor JSON *file*, e.g.,
-                  `./my_model_directory/preprocessor_config.json`.
-
-            use_fast (`bool`, *optional*, defaults to `True`):
-                Whether or not to instantiate a fast tokenizer.
-
-            **kwargs
-                Additional keyword arguments passed along to both [`SequenceFeatureExtractor`] and
-                [`PreTrainedTokenizer`]
-        """
-        feature_extractor = LayoutLMv2FeatureExtractor.from_pretrained(pretrained_model_name_or_path, **kwargs)
-        if use_fast:
-            tokenizer = LayoutLMv2TokenizerFast.from_pretrained(pretrained_model_name_or_path, **kwargs)
-        else:
-            tokenizer = LayoutLMv2Tokenizer.from_pretrained(pretrained_model_name_or_path, **kwargs)
-
-        return cls(feature_extractor=feature_extractor, tokenizer=tokenizer)
+        super().__init__(image_processor, tokenizer)
 
     def __call__(
         self,
@@ -143,38 +87,39 @@ class LayoutLMv2Processor:
         return_length: bool = False,
         verbose: bool = True,
         return_tensors: Optional[Union[str, TensorType]] = None,
-        **kwargs
+        **kwargs,
     ) -> BatchEncoding:
         """
-        This method first forwards the `images` argument to [`~LayoutLMv2FeatureExtractor.__call__`]. In case
-        [`LayoutLMv2FeatureExtractor`] was initialized with `apply_ocr` set to `True`, it passes the obtained words and
+        This method first forwards the `images` argument to [`~LayoutLMv2ImageProcessor.__call__`]. In case
+        [`LayoutLMv2ImageProcessor`] was initialized with `apply_ocr` set to `True`, it passes the obtained words and
         bounding boxes along with the additional arguments to [`~LayoutLMv2Tokenizer.__call__`] and returns the output,
-        together with resized `images`. In case [`LayoutLMv2FeatureExtractor`] was initialized with `apply_ocr` set to
+        together with resized `images`. In case [`LayoutLMv2ImageProcessor`] was initialized with `apply_ocr` set to
         `False`, it passes the words (`text`/``text_pair`) and `boxes` specified by the user along with the additional
         arguments to [`~LayoutLMv2Tokenizer.__call__`] and returns the output, together with resized `images``.
 
         Please refer to the docstring of the above two methods for more information.
         """
         # verify input
-        if self.feature_extractor.apply_ocr and (boxes is not None):
+        if self.image_processor.apply_ocr and (boxes is not None):
             raise ValueError(
-                "You cannot provide bounding boxes "
-                "if you initialized the feature extractor with apply_ocr set to True."
+                "You cannot provide bounding boxes if you initialized the image processor with apply_ocr set to True."
             )
 
-        if self.feature_extractor.apply_ocr and (word_labels is not None):
+        if self.image_processor.apply_ocr and (word_labels is not None):
             raise ValueError(
-                "You cannot provide word labels "
-                "if you initialized the feature extractor with apply_ocr set to True."
+                "You cannot provide word labels if you initialized the image processor with apply_ocr set to True."
             )
 
-        # first, apply the feature extractor
-        features = self.feature_extractor(images=images, return_tensors=return_tensors)
+        if return_overflowing_tokens is True and return_offsets_mapping is False:
+            raise ValueError("You cannot return overflowing tokens without returning the offsets mapping.")
+
+        # first, apply the image processor
+        features = self.image_processor(images=images, return_tensors=return_tensors)
 
         # second, apply the tokenizer
-        if text is not None and self.feature_extractor.apply_ocr and text_pair is None:
+        if text is not None and self.image_processor.apply_ocr and text_pair is None:
             if isinstance(text, str):
-                text = [text]  # add batch dimension (as the feature extractor always adds a batch dimension)
+                text = [text]  # add batch dimension (as the image processor always adds a batch dimension)
             text_pair = features["words"]
 
         encoded_inputs = self.tokenizer(
@@ -200,6 +145,60 @@ class LayoutLMv2Processor:
         )
 
         # add pixel values
-        encoded_inputs["image"] = features.pop("pixel_values")
+        images = features.pop("pixel_values")
+        if return_overflowing_tokens is True:
+            images = self.get_overflowing_images(images, encoded_inputs["overflow_to_sample_mapping"])
+        encoded_inputs["image"] = images
 
         return encoded_inputs
+
+    def get_overflowing_images(self, images, overflow_to_sample_mapping):
+        # in case there's an overflow, ensure each `input_ids` sample is mapped to its corresponding image
+        images_with_overflow = []
+        for sample_idx in overflow_to_sample_mapping:
+            images_with_overflow.append(images[sample_idx])
+
+        if len(images_with_overflow) != len(overflow_to_sample_mapping):
+            raise ValueError(
+                "Expected length of images to be the same as the length of `overflow_to_sample_mapping`, but got"
+                f" {len(images_with_overflow)} and {len(overflow_to_sample_mapping)}"
+            )
+
+        return images_with_overflow
+
+    def batch_decode(self, *args, **kwargs):
+        """
+        This method forwards all its arguments to PreTrainedTokenizer's [`~PreTrainedTokenizer.batch_decode`]. Please
+        refer to the docstring of this method for more information.
+        """
+        return self.tokenizer.batch_decode(*args, **kwargs)
+
+    def decode(self, *args, **kwargs):
+        """
+        This method forwards all its arguments to PreTrainedTokenizer's [`~PreTrainedTokenizer.decode`]. Please refer
+        to the docstring of this method for more information.
+        """
+        return self.tokenizer.decode(*args, **kwargs)
+
+    @property
+    def model_input_names(self):
+        return ["input_ids", "bbox", "token_type_ids", "attention_mask", "image"]
+
+    @property
+    def feature_extractor_class(self):
+        warnings.warn(
+            "`feature_extractor_class` is deprecated and will be removed in v5. Use `image_processor_class` instead.",
+            FutureWarning,
+        )
+        return self.image_processor_class
+
+    @property
+    def feature_extractor(self):
+        warnings.warn(
+            "`feature_extractor` is deprecated and will be removed in v5. Use `image_processor` instead.",
+            FutureWarning,
+        )
+        return self.image_processor
+
+
+__all__ = ["LayoutLMv2Processor"]

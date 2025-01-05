@@ -13,8 +13,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-""" Fine-pruning Masked BERT for question-answering on SQuAD."""
-
+"""Fine-pruning Masked BERT for question-answering on SQuAD."""
 
 import argparse
 import glob
@@ -25,12 +24,12 @@ import timeit
 
 import numpy as np
 import torch
+from emmental import MaskedBertConfig, MaskedBertForQuestionAnswering
 from torch import nn
 from torch.utils.data import DataLoader, RandomSampler, SequentialSampler
 from torch.utils.data.distributed import DistributedSampler
 from tqdm import tqdm, trange
 
-from emmental import MaskedBertConfig, MaskedBertForQuestionAnswering
 from transformers import (
     WEIGHTS_NAME,
     AdamW,
@@ -67,7 +66,7 @@ def set_seed(args):
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
     if args.n_gpu > 0:
-        torch.to(xm.xla_device()).manual_seed_all(args.seed)
+        torch.cuda.manual_seed_all(args.seed)
 
 
 def schedule_threshold(
@@ -88,7 +87,7 @@ def schedule_threshold(
         spars_warmup_steps = initial_warmup * warmup_steps
         spars_schedu_steps = (final_warmup + initial_warmup) * warmup_steps
         mul_coeff = 1 - (step - spars_warmup_steps) / (total_step - spars_schedu_steps)
-        threshold = final_threshold + (initial_threshold - final_threshold) * (mul_coeff ** 3)
+        threshold = final_threshold + (initial_threshold - final_threshold) * (mul_coeff**3)
     regu_lambda = final_lambda * threshold / final_threshold
     return threshold, regu_lambda
 
@@ -102,7 +101,7 @@ def regularization(model: nn.Module, mode: str):
             elif mode == "l0":
                 regu += torch.sigmoid(param - 2 / 3 * np.log(0.1 / 1.1)).sum() / param.numel()
             else:
-                ValueError("Don't know this mode.")
+                raise ValueError("Don't know this mode.")
             counter += 1
     return regu / counter
 
@@ -236,7 +235,6 @@ def train(args, train_dataset, model, tokenizer, teacher=None):
     for _ in train_iterator:
         epoch_iterator = tqdm(train_dataloader, desc="Iteration", disable=args.local_rank not in [-1, 0])
         for step, batch in enumerate(epoch_iterator):
-
             # Skip past any already trained steps if resuming training
             if steps_trained_in_current_epoch > 0:
                 steps_trained_in_current_epoch -= 1
@@ -306,22 +304,16 @@ def train(args, train_dataset, model, tokenizer, teacher=None):
                         attention_mask=inputs["attention_mask"],
                     )
 
-                loss_start = (
-                    nn.functional.kl_div(
-                        input=nn.functional.log_softmax(start_logits_stu / args.temperature, dim=-1),
-                        target=nn.functional.softmax(start_logits_tea / args.temperature, dim=-1),
-                        reduction="batchmean",
-                    )
-                    * (args.temperature ** 2)
-                )
-                loss_end = (
-                    nn.functional.kl_div(
-                        input=nn.functional.log_softmax(end_logits_stu / args.temperature, dim=-1),
-                        target=nn.functional.softmax(end_logits_tea / args.temperature, dim=-1),
-                        reduction="batchmean",
-                    )
-                    * (args.temperature ** 2)
-                )
+                loss_start = nn.functional.kl_div(
+                    input=nn.functional.log_softmax(start_logits_stu / args.temperature, dim=-1),
+                    target=nn.functional.softmax(start_logits_tea / args.temperature, dim=-1),
+                    reduction="batchmean",
+                ) * (args.temperature**2)
+                loss_end = nn.functional.kl_div(
+                    input=nn.functional.log_softmax(end_logits_stu / args.temperature, dim=-1),
+                    target=nn.functional.softmax(end_logits_tea / args.temperature, dim=-1),
+                    reduction="batchmean",
+                ) * (args.temperature**2)
                 loss_logits = (loss_start + loss_end) / 2.0
 
                 loss = args.alpha_distil * loss_logits + args.alpha_ce * loss
@@ -743,8 +735,10 @@ def main():
         "--max_seq_length",
         default=384,
         type=int,
-        help="The maximum total input sequence length after WordPiece tokenization. Sequences "
-        "longer than this will be truncated, and sequences shorter than this will be padded.",
+        help=(
+            "The maximum total input sequence length after WordPiece tokenization. Sequences "
+            "longer than this will be truncated, and sequences shorter than this will be padded."
+        ),
     )
     parser.add_argument(
         "--doc_stride",
@@ -756,8 +750,10 @@ def main():
         "--max_query_length",
         default=64,
         type=int,
-        help="The maximum number of tokens for the question. Questions longer than this will "
-        "be truncated to this length.",
+        help=(
+            "The maximum number of tokens for the question. Questions longer than this will "
+            "be truncated to this length."
+        ),
     )
     parser.add_argument("--do_train", action="store_true", help="Whether to run training.")
     parser.add_argument("--do_eval", action="store_true", help="Whether to run eval on the dev set.")
@@ -791,22 +787,29 @@ def main():
         "--initial_warmup",
         default=1,
         type=int,
-        help="Run `initial_warmup` * `warmup_steps` steps of threshold warmup during which threshold stays"
-        "at its `initial_threshold` value (sparsity schedule).",
+        help=(
+            "Run `initial_warmup` * `warmup_steps` steps of threshold warmup during which threshold stays "
+            "at its `initial_threshold` value (sparsity schedule)."
+        ),
     )
     parser.add_argument(
         "--final_warmup",
         default=2,
         type=int,
-        help="Run `final_warmup` * `warmup_steps` steps of threshold cool-down during which threshold stays"
-        "at its final_threshold value (sparsity schedule).",
+        help=(
+            "Run `final_warmup` * `warmup_steps` steps of threshold cool-down during which threshold stays "
+            "at its final_threshold value (sparsity schedule)."
+        ),
     )
 
     parser.add_argument(
         "--pruning_method",
         default="topK",
         type=str,
-        help="Pruning Method (l0 = L0 regularization, magnitude = Magnitude pruning, topK = Movement pruning, sigmoied_threshold = Soft movement pruning).",
+        help=(
+            "Pruning Method (l0 = L0 regularization, magnitude = Magnitude pruning, topK = Movement pruning,"
+            " sigmoied_threshold = Soft movement pruning)."
+        ),
     )
     parser.add_argument(
         "--mask_init",
@@ -839,7 +842,10 @@ def main():
         "--teacher_type",
         default=None,
         type=str,
-        help="Teacher type. Teacher tokenizer and student (model) tokenizer must output the same tokenization. Only for distillation.",
+        help=(
+            "Teacher type. Teacher tokenizer and student (model) tokenizer must output the same tokenization. Only for"
+            " distillation."
+        ),
     )
     parser.add_argument(
         "--teacher_name_or_path",
@@ -889,20 +895,27 @@ def main():
         "--max_answer_length",
         default=30,
         type=int,
-        help="The maximum length of an answer that can be generated. This is needed because the start "
-        "and end predictions are not conditioned on one another.",
+        help=(
+            "The maximum length of an answer that can be generated. This is needed because the start "
+            "and end predictions are not conditioned on one another."
+        ),
     )
     parser.add_argument(
         "--verbose_logging",
         action="store_true",
-        help="If true, all of the warnings related to data processing will be printed. "
-        "A number of warnings are expected for a normal SQuAD evaluation.",
+        help=(
+            "If true, all of the warnings related to data processing will be printed. "
+            "A number of warnings are expected for a normal SQuAD evaluation."
+        ),
     )
     parser.add_argument(
         "--lang_id",
         default=0,
         type=int,
-        help="language id of input for language-specific xlm models (see tokenization_xlm.PRETRAINED_INIT_CONFIGURATION)",
+        help=(
+            "language id of input for language-specific xlm models (see"
+            " tokenization_xlm.PRETRAINED_INIT_CONFIGURATION)"
+        ),
     )
 
     parser.add_argument("--logging_steps", type=int, default=500, help="Log every X updates steps.")
@@ -931,8 +944,10 @@ def main():
         "--fp16_opt_level",
         type=str,
         default="O1",
-        help="For fp16: Apex AMP optimization level selected in ['O0', 'O1', 'O2', and 'O3']."
-        "See details at https://nvidia.github.io/apex/amp.html",
+        help=(
+            "For fp16: Apex AMP optimization level selected in ['O0', 'O1', 'O2', and 'O3']. "
+            "See details at https://nvidia.github.io/apex/amp.html"
+        ),
     )
     parser.add_argument("--server_ip", type=str, default="", help="Can be used for distant debugging.")
     parser.add_argument("--server_port", type=str, default="", help="Can be used for distant debugging.")
@@ -974,10 +989,10 @@ def main():
 
     # Setup CUDA, GPU & distributed training
     if args.local_rank == -1 or args.no_cuda:
-        device = torch.device("cuda" if torch.to(xm.xla_device()).is_available() and not args.no_cuda else "cpu")
-        args.n_gpu = 0 if args.no_cuda else torch.to(xm.xla_device()).device_count()
+        device = torch.device("cuda" if torch.cuda.is_available() and not args.no_cuda else "cpu")
+        args.n_gpu = 0 if args.no_cuda else torch.cuda.device_count()
     else:  # Initializes the distributed backend which will take care of synchronizing nodes/GPUs
-        torch.to(xm.xla_device()).set_device(args.local_rank)
+        torch.cuda.set_device(args.local_rank)
         device = torch.device("cuda", args.local_rank)
         torch.distributed.init_process_group(backend="nccl")
         args.n_gpu = 1
@@ -1093,10 +1108,10 @@ def main():
             logger.info("Loading checkpoints saved during training for evaluation")
             checkpoints = [args.output_dir]
             if args.eval_all_checkpoints:
-                checkpoints = list(
+                checkpoints = [
                     os.path.dirname(c)
                     for c in sorted(glob.glob(args.output_dir + "/**/" + WEIGHTS_NAME, recursive=True))
-                )
+                ]
 
         else:
             logger.info("Loading checkpoint %s for evaluation", args.model_name_or_path)
@@ -1113,7 +1128,7 @@ def main():
             # Evaluate
             result = evaluate(args, model, tokenizer, prefix=global_step)
 
-            result = dict((k + ("_{}".format(global_step) if global_step else ""), v) for k, v in result.items())
+            result = {k + ("_{}".format(global_step) if global_step else ""): v for k, v in result.items()}
             results.update(result)
 
     logger.info("Results: {}".format(results))

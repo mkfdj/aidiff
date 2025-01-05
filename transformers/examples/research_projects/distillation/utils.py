@@ -12,9 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-""" Utils to train DistilBERT
-    adapted in part from Facebook, Inc XLM model (https://github.com/facebookresearch/XLM)
+"""Utils to train DistilBERT
+adapted in part from Facebook, Inc XLM model (https://github.com/facebookresearch/XLM)
 """
+
 import json
 import logging
 import os
@@ -59,7 +60,7 @@ def init_gpu_params(params):
         params.multi_gpu = False
         return
 
-    assert torch.to(xm.xla_device()).is_available()
+    assert torch.cuda.is_available()
 
     logger.info("Initializing GPUs")
     if params.n_gpu > 1:
@@ -112,7 +113,7 @@ def init_gpu_params(params):
     logger.info(PREFIX + "Hostname       : %s" % socket.gethostname())
 
     # set GPU device
-    torch.to(xm.xla_device()).set_device(params.local_rank)
+    torch.cuda.set_device(params.local_rank)
 
     # initialize multi-GPU
     if params.multi_gpu:
@@ -130,4 +131,4 @@ def set_seed(args):
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
     if args.n_gpu > 0:
-        torch.to(xm.xla_device()).manual_seed_all(args.seed)
+        torch.cuda.manual_seed_all(args.seed)

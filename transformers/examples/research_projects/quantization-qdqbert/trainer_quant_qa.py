@@ -20,17 +20,17 @@ A subclass of `Trainer` specific to Question-Answering tasks
 import logging
 import os
 
+import quant_trainer
 import torch
 from torch.utils.data import DataLoader
 
-import quant_trainer
-from transformers import Trainer, is_torch_tpu_available
+from transformers import Trainer, is_torch_xla_available
 from transformers.trainer_utils import PredictionOutput
 
 
 logger = logging.getLogger(__name__)
 
-if is_torch_tpu_available():
+if is_torch_xla_available():
     import torch_xla.core.xla_model as xm
     import torch_xla.debug.metrics as met
 
@@ -168,7 +168,7 @@ class QuestionAnsweringTrainer(Trainer):
         batch = next(iter(eval_dataloader))
 
         # saving device - to make it consistent
-        device = torch.device("cuda" if torch.to(xm.xla_device()).is_available() else "cpu")
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         # convert to tuple
         input_tuple = tuple(v.to(device) for k, v in batch.items())

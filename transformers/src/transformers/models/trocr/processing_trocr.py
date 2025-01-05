@@ -15,110 +15,99 @@
 """
 Processor class for TrOCR.
 """
+
+import warnings
 from contextlib import contextmanager
+from typing import List, Union
 
-from transformers import AutoFeatureExtractor, AutoTokenizer
-from transformers.feature_extraction_utils import FeatureExtractionMixin
-from transformers.models.roberta.tokenization_roberta import RobertaTokenizer
-from transformers.models.roberta.tokenization_roberta_fast import RobertaTokenizerFast
-from transformers.models.xlm_roberta.tokenization_xlm_roberta import XLMRobertaTokenizer
-from transformers.models.xlm_roberta.tokenization_xlm_roberta_fast import XLMRobertaTokenizerFast
+from ...image_processing_utils import BatchFeature
+from ...image_utils import ImageInput
+from ...processing_utils import ProcessingKwargs, ProcessorMixin, Unpack
+from ...tokenization_utils_base import PreTokenizedInput, TextInput
 
 
-class TrOCRProcessor:
+class TrOCRProcessorKwargs(ProcessingKwargs, total=False):
+    _defaults = {}
+
+
+class TrOCRProcessor(ProcessorMixin):
     r"""
-    Constructs a TrOCR processor which wraps a vision feature extractor and a TrOCR tokenizer into a single processor.
+    Constructs a TrOCR processor which wraps a vision image processor and a TrOCR tokenizer into a single processor.
 
-    [`TrOCRProcessor`] offers all the functionalities of [`ViTFeatureExtractor`/`DeiTFeatureExtractor`] and
+    [`TrOCRProcessor`] offers all the functionalities of [`ViTImageProcessor`/`DeiTImageProcessor`] and
     [`RobertaTokenizer`/`XLMRobertaTokenizer`]. See the [`~TrOCRProcessor.__call__`] and [`~TrOCRProcessor.decode`] for
     more information.
 
     Args:
-        feature_extractor ([`ViTFeatureExtractor`/`DeiTFeatureExtractor`]):
-            An instance of [`ViTFeatureExtractor`/`DeiTFeatureExtractor`]. The feature extractor is a required input.
-        tokenizer ([`RobertaTokenizer`/`XLMRobertaTokenizer`]):
+        image_processor ([`ViTImageProcessor`/`DeiTImageProcessor`], *optional*):
+            An instance of [`ViTImageProcessor`/`DeiTImageProcessor`]. The image processor is a required input.
+        tokenizer ([`RobertaTokenizer`/`XLMRobertaTokenizer`], *optional*):
             An instance of [`RobertaTokenizer`/`XLMRobertaTokenizer`]. The tokenizer is a required input.
     """
 
-    def __init__(self, feature_extractor, tokenizer):
-        if not isinstance(feature_extractor, FeatureExtractionMixin):
-            raise ValueError(
-                f"`feature_extractor` has to be of type {FeatureExtractionMixin.__class__}, but is {type(feature_extractor)}"
+    attributes = ["image_processor", "tokenizer"]
+    image_processor_class = "AutoImageProcessor"
+    tokenizer_class = "AutoTokenizer"
+
+    def __init__(self, image_processor=None, tokenizer=None, **kwargs):
+        feature_extractor = None
+        if "feature_extractor" in kwargs:
+            warnings.warn(
+                "The `feature_extractor` argument is deprecated and will be removed in v5, use `image_processor`"
+                " instead.",
+                FutureWarning,
             )
-        if not isinstance(
-            tokenizer, (RobertaTokenizer, RobertaTokenizerFast, XLMRobertaTokenizer, XLMRobertaTokenizerFast)
-        ):
-            raise ValueError(
-                f"`tokenizer` has to be of type {RobertaTokenizer.__class__} or {RobertaTokenizerFast.__class__} or {XLMRobertaTokenizer.__class__} or {XLMRobertaTokenizerFast.__class__}, but is {type(tokenizer)}"
-            )
+            feature_extractor = kwargs.pop("feature_extractor")
 
-        self.feature_extractor = feature_extractor
-        self.tokenizer = tokenizer
-        self.current_processor = self.feature_extractor
+        image_processor = image_processor if image_processor is not None else feature_extractor
+        if image_processor is None:
+            raise ValueError("You need to specify an `image_processor`.")
+        if tokenizer is None:
+            raise ValueError("You need to specify a `tokenizer`.")
 
-    def save_pretrained(self, save_directory):
+        super().__init__(image_processor, tokenizer)
+        self.current_processor = self.image_processor
+        self._in_target_context_manager = False
+
+    def __call__(
+        self,
+        images: ImageInput = None,
+        text: Union[TextInput, PreTokenizedInput, List[TextInput], List[PreTokenizedInput]] = None,
+        audio=None,
+        videos=None,
+        **kwargs: Unpack[TrOCRProcessorKwargs],
+    ) -> BatchFeature:
         """
-        Save a TrOCR feature extractor object and TrOCR tokenizer object to the directory `save_directory`, so that it
-        can be re-loaded using the [`~TrOCRProcessor.from_pretrained`] class method.
-
-        <Tip>
-
-        This class method is simply calling [`~PreTrainedFeatureExtractor.save_pretrained`] and
-        [`~tokenization_utils_base.PreTrainedTokenizer.save_pretrained`]. Please refer to the docstrings of the methods
-        above for more information.
-
-        </Tip>
-
-        Args:
-            save_directory (`str` or `os.PathLike`):
-                Directory where the feature extractor JSON file and the tokenizer files will be saved (directory will
-                be created if it does not exist).
-        """
-
-        self.feature_extractor.save_pretrained(save_directory)
-        self.tokenizer.save_pretrained(save_directory)
-
-    @classmethod
-    def from_pretrained(cls, pretrained_model_name_or_path, **kwargs):
-        r"""
-        Instantiate a [`TrOCRProcessor`] from a pretrained TrOCR processor.
-
-        <Tip>
-
-        This class method is simply calling AutoFeatureExtractor's [`~PreTrainedFeatureExtractor.from_pretrained`] and
-        TrOCRTokenizer's [`~tokenization_utils_base.PreTrainedTokenizer.from_pretrained`]. Please refer to the
-        docstrings of the methods above for more information.
-
-        </Tip>
-
-        Args:
-            pretrained_model_name_or_path (`str` or `os.PathLike`):
-                This can be either:
-
-                - a string, the *model id* of a pretrained feature_extractor hosted inside a model repo on
-                  huggingface.co. Valid model ids can be located at the root-level, like `bert-base-uncased`, or
-                  namespaced under a user or organization name, like `dbmdz/bert-base-german-cased`.
-                - a path to a *directory* containing a feature extractor file saved using the
-                  [`~PreTrainedFeatureExtractor.save_pretrained`] method, e.g., `./my_model_directory/`.
-                - a path or url to a saved feature extractor JSON *file*, e.g.,
-                  `./my_model_directory/preprocessor_config.json`.
-            **kwargs
-                Additional keyword arguments passed along to both [`PreTrainedFeatureExtractor`] and
-                [`PreTrainedTokenizer`]
-        """
-        feature_extractor = AutoFeatureExtractor.from_pretrained(pretrained_model_name_or_path, **kwargs)
-        tokenizer = AutoTokenizer.from_pretrained(pretrained_model_name_or_path, **kwargs)
-
-        return cls(feature_extractor=feature_extractor, tokenizer=tokenizer)
-
-    def __call__(self, *args, **kwargs):
-        """
-        When used in normal mode, this method forwards all its arguments to AutoFeatureExtractor's
-        [`~AutoFeatureExtractor.__call__`] and returns its output. If used in the context
+        When used in normal mode, this method forwards all its arguments to AutoImageProcessor's
+        [`~AutoImageProcessor.__call__`] and returns its output. If used in the context
         [`~TrOCRProcessor.as_target_processor`] this method forwards all its arguments to TrOCRTokenizer's
         [`~TrOCRTokenizer.__call__`]. Please refer to the doctsring of the above two methods for more information.
         """
-        return self.current_processor(*args, **kwargs)
+        # For backward compatibility
+        if self._in_target_context_manager:
+            return self.current_processor(images, **kwargs)
+
+        if images is None and text is None:
+            raise ValueError("You need to specify either an `images` or `text` input to process.")
+
+        output_kwargs = self._merge_kwargs(
+            TrOCRProcessorKwargs,
+            tokenizer_init_kwargs=self.tokenizer.init_kwargs,
+            **kwargs,
+        )
+
+        if images is not None:
+            inputs = self.image_processor(images, **output_kwargs["images_kwargs"])
+        if text is not None:
+            encodings = self.tokenizer(text, **output_kwargs["text_kwargs"])
+
+        if text is None:
+            return inputs
+        elif images is None:
+            return encodings
+        else:
+            inputs["labels"] = encodings["input_ids"]
+            return inputs
 
     def batch_decode(self, *args, **kwargs):
         """
@@ -139,6 +128,32 @@ class TrOCRProcessor:
         """
         Temporarily sets the tokenizer for processing the input. Useful for encoding the labels when fine-tuning TrOCR.
         """
+        warnings.warn(
+            "`as_target_processor` is deprecated and will be removed in v5 of Transformers. You can process your "
+            "labels by using the argument `text` of the regular `__call__` method (either in the same call as "
+            "your images inputs, or in a separate call."
+        )
+        self._in_target_context_manager = True
         self.current_processor = self.tokenizer
         yield
-        self.current_processor = self.feature_extractor
+        self.current_processor = self.image_processor
+        self._in_target_context_manager = False
+
+    @property
+    def feature_extractor_class(self):
+        warnings.warn(
+            "`feature_extractor_class` is deprecated and will be removed in v5. Use `image_processor_class` instead.",
+            FutureWarning,
+        )
+        return self.image_processor_class
+
+    @property
+    def feature_extractor(self):
+        warnings.warn(
+            "`feature_extractor` is deprecated and will be removed in v5. Use `image_processor` instead.",
+            FutureWarning,
+        )
+        return self.image_processor
+
+
+__all__ = ["TrOCRProcessor"]

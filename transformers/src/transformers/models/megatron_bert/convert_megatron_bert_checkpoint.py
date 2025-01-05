@@ -150,11 +150,12 @@ def convert_megatron_checkpoint(args, input_state_dict, config):
     transformer = lm["transformer"] if "transformer" in lm.keys() else lm["encoder"]
 
     # The regex to extract layer names.
-    layer_re = re.compile("layers\.(\d+)\.([a-z0-9_.]+)\.([a-z]+)")
+    layer_re = re.compile(r"layers\.(\d+)\.([a-z0-9_.]+)\.([a-z]+)")
 
     # The simple map of names for "automated" rules.
     megatron_to_transformers = {
         "attention.dense": ".attention.output.dense.",
+        "self_attention.dense": ".attention.output.dense.",
         "mlp.dense_h_to_4h": ".intermediate.dense.",
         "mlp.dense_4h_to_h": ".output.dense.",
     }
@@ -183,13 +184,13 @@ def convert_megatron_checkpoint(args, input_state_dict, config):
 
         # For layernorm(s), simply store the layer norm.
         if op_name.endswith("layernorm"):
-
             ln_name = "attention.ln" if op_name.startswith("input") else "ln"
             output_state_dict[layer_name + "." + ln_name + "." + weight_or_bias] = val
 
         # Transpose the QKV matrix.
-        elif op_name == "attention.query_key_value" and weight_or_bias == "weight":
-
+        elif (
+            op_name == "attention.query_key_value" or op_name == "self_attention.query_key_value"
+        ) and weight_or_bias == "weight":
             # Make sure the QKV pointer is nil.
             assert attention_qkv_weight is None, ""
 
@@ -198,8 +199,9 @@ def convert_megatron_checkpoint(args, input_state_dict, config):
             attention_qkv_weight = out_val
 
         # Transpose the bias.
-        elif op_name == "attention.query_key_value" and weight_or_bias == "bias":
-
+        elif (
+            op_name == "attention.query_key_value" or op_name == "self_attention.query_key_value"
+        ) and weight_or_bias == "bias":
             # Make sure we read the weight tensor.
             assert attention_qkv_weight is not None, ""
 
@@ -227,7 +229,6 @@ def convert_megatron_checkpoint(args, input_state_dict, config):
 
         # Copy weights and biases as is.
         elif weight_or_bias in ["weight", "bias"]:
-
             out_name = megatron_to_transformers[op_name]
             output_state_dict[layer_name + out_name + weight_or_bias] = val
 
@@ -300,6 +301,10 @@ def main():
     if args.config_file == "":
         # Default config of megatron-bert 345m
         config = MegatronBertConfig()
+
+        # different megatron-bert-*-345m models have different vocab sizes, so override the default
+        # config (which is for megatron-bert-cased-345m) with the actual vocab dimension
+        config.vocab_size = input_state_dict["model"]["lm_head"]["bias"].numel()
     else:
         config = MegatronBertConfig.from_json_file(args.config_file)
 

@@ -1,4 +1,3 @@
-# flake8: noqa
 # Copyright 2020 The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,7 +14,7 @@
 
 from typing import TYPE_CHECKING
 
-from ..file_utils import _LazyModule
+from ..utils import _LazyModule
 
 
 _import_structure = {

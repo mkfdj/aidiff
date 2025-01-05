@@ -12,24 +12,19 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-""" MBART model configuration"""
+"""MBART model configuration"""
+
 from collections import OrderedDict
 from typing import Any, Mapping, Optional
 
 from ... import PreTrainedTokenizer
 from ...configuration_utils import PretrainedConfig
-from ...file_utils import TensorType, is_torch_available
 from ...onnx import OnnxConfig, OnnxConfigWithPast, OnnxSeq2SeqConfigWithPast
 from ...onnx.utils import compute_effective_axis_dimension
-from ...utils import logging
+from ...utils import TensorType, is_torch_available, logging
 
 
 logger = logging.get_logger(__name__)
-
-MBART_PRETRAINED_CONFIG_ARCHIVE_MAP = {
-    "facebook/mbart-large-cc25": "https://huggingface.co/facebook/mbart-large-cc25/resolve/main/config.json",
-    # See all MBART models at https://huggingface.co/models?filter=mbart
-}
 
 
 class MBartConfig(PretrainedConfig):
@@ -77,10 +72,10 @@ class MBartConfig(PretrainedConfig):
             just in case (e.g., 512 or 1024 or 2048).
         init_std (`float`, *optional*, defaults to 0.02):
             The standard deviation of the truncated_normal_initializer for initializing all weight matrices.
-        encoder_layerdrop: (`float`, *optional*, defaults to 0.0):
+        encoder_layerdrop (`float`, *optional*, defaults to 0.0):
             The LayerDrop probability for the encoder. See the [LayerDrop paper](see https://arxiv.org/abs/1909.11556)
             for more details.
-        decoder_layerdrop: (`float`, *optional*, defaults to 0.0):
+        decoder_layerdrop (`float`, *optional*, defaults to 0.0):
             The LayerDrop probability for the decoder. See the [LayerDrop paper](see https://arxiv.org/abs/1909.11556)
             for more details.
         scale_embedding (`bool`, *optional*, defaults to `False`):
@@ -94,17 +89,18 @@ class MBartConfig(PretrainedConfig):
     Example:
 
     ```python
-    >>> from transformers import MBartModel, MBartConfig
+    >>> from transformers import MBartConfig, MBartModel
 
     >>> # Initializing a MBART facebook/mbart-large-cc25 style configuration
     >>> configuration = MBartConfig()
 
-    >>> # Initializing a model from the facebook/mbart-large-cc25 style configuration
+    >>> # Initializing a model (with random weights) from the facebook/mbart-large-cc25 style configuration
     >>> model = MBartModel(configuration)
 
     >>> # Accessing the model configuration
     >>> configuration = model.config
     ```"""
+
     model_type = "mbart"
     keys_to_ignore_at_inference = ["past_key_values"]
     attribute_map = {"num_attention_heads": "encoder_attention_heads", "hidden_size": "d_model"}
@@ -135,7 +131,7 @@ class MBartConfig(PretrainedConfig):
         bos_token_id=0,
         eos_token_id=2,
         forced_eos_token_id=2,
-        **kwargs
+        **kwargs,
     ):
         self.vocab_size = vocab_size
         self.max_position_embeddings = max_position_embeddings
@@ -323,8 +319,9 @@ class MBartOnnxConfig(OnnxSeq2SeqConfigWithPast):
                 self._config.hidden_size // num_encoder_attention_heads,
             )
 
+            mask_dtype = common_inputs["attention_mask"].dtype
             common_inputs["attention_mask"] = torch.cat(
-                [common_inputs["attention_mask"], torch.ones(batch, past_key_values_length)], dim=1
+                [common_inputs["attention_mask"], torch.ones(batch, past_key_values_length, dtype=mask_dtype)], dim=1
             )
             common_inputs["past_key_values"] = [
                 (torch.zeros(past_shape), torch.zeros(past_shape)) for _ in range(num_encoder_layers)
@@ -343,13 +340,13 @@ class MBartOnnxConfig(OnnxSeq2SeqConfigWithPast):
         # Did not use super(OnnxConfigWithPast, self).generate_dummy_inputs for code clarity.
         # If dynamic axis (-1) we forward with a fixed dimension of 2 samples to avoid optimizations made by ONNX
         batch_size = compute_effective_axis_dimension(
-            batch_size, fixed_dimension=OnnxConfig.DEFAULT_FIXED_BATCH, num_token_to_add=0
+            batch_size, fixed_dimension=OnnxConfig.default_fixed_batch, num_token_to_add=0
         )
 
         # If dynamic axis (-1) we forward with a fixed dimension of 8 tokens to avoid optimizations made by ONNX
         token_to_add = tokenizer.num_special_tokens_to_add(is_pair)
         seq_length = compute_effective_axis_dimension(
-            seq_length, fixed_dimension=OnnxConfig.DEFAULT_FIXED_SEQUENCE, num_token_to_add=token_to_add
+            seq_length, fixed_dimension=OnnxConfig.default_fixed_sequence, num_token_to_add=token_to_add
         )
 
         # Generate dummy inputs according to compute batch and sequence
@@ -388,3 +385,6 @@ class MBartOnnxConfig(OnnxSeq2SeqConfigWithPast):
             flattened_output = super(OnnxSeq2SeqConfigWithPast, self)._flatten_past_key_values_(
                 flattened_output, name, idx, t
             )
+
+
+__all__ = ["MBartConfig", "MBartOnnxConfig"]

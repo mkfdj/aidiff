@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
-""" This script is adapted from the Bertology pruning code (https://github.com/huggingface/transformers/blob/783d7d2629e97c5f0c5f9ef01b8c66410275c204/examples/research_projects/bertology/run_bertology.py)
+"""This script is adapted from the Bertology pruning code (https://github.com/huggingface/transformers/blob/783d7d2629e97c5f0c5f9ef01b8c66410275c204/examples/research_projects/bertology/run_bertology.py)
 to prune GPT-like models. The author is @altsoph.
 """
 
 import argparse
 import logging
-import torch_xla.core.xla_model as xm
 import os
 from datetime import datetime
 
@@ -195,9 +194,9 @@ def prune_heads(args, model, eval_dataloader, head_mask):
     original_time = datetime.now() - before_time
 
     original_num_params = sum(p.numel() for p in model.parameters())
-    heads_to_prune = dict(
-        (layer, (1 - head_mask[layer].long()).nonzero().squeeze().tolist()) for layer in range(len(head_mask))
-    )
+    heads_to_prune = {
+        layer: (1 - head_mask[layer].long()).nonzero().squeeze().tolist() for layer in range(len(head_mask))
+    }
 
     for k, v in heads_to_prune.items():
         if isinstance(v, int):
@@ -315,8 +314,10 @@ def main():
         "--max_seq_length",
         default=128,
         type=int,
-        help="The maximum total input sequence length after WordPiece tokenization. \n"
-        "Sequences longer than this will be truncated, sequences shorter padded.",
+        help=(
+            "The maximum total input sequence length after WordPiece tokenization. \n"
+            "Sequences longer than this will be truncated, sequences shorter padded."
+        ),
     )
     parser.add_argument("--batch_size", default=1, type=int, help="Batch size.")
 
@@ -337,10 +338,10 @@ def main():
 
     # Setup devices and distributed training
     if args.local_rank == -1 or args.no_cuda:
-        args.device = torch.device("cuda" if torch.to(xm.xla_device()).is_available() and not args.no_cuda else "cpu")
-        args.n_gpu = 0 if args.no_cuda else torch.to(xm.xla_device()).device_count()
+        args.device = torch.device("cuda" if torch.cuda.is_available() and not args.no_cuda else "cpu")
+        args.n_gpu = 0 if args.no_cuda else torch.cuda.device_count()
     else:
-        torch.to(xm.xla_device()).set_device(args.local_rank)
+        torch.cuda.set_device(args.local_rank)
         args.device = torch.device("cuda", args.local_rank)
         args.n_gpu = 1
         torch.distributed.init_process_group(backend="nccl")  # Initializes the distributed backend

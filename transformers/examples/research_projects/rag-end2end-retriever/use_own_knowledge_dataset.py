@@ -6,16 +6,16 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import List, Optional
 
+import faiss
 import torch
 from datasets import Features, Sequence, Value, load_dataset
 
-import faiss
 from transformers import DPRContextEncoder, DPRContextEncoderTokenizerFast, HfArgumentParser
 
 
 logger = logging.getLogger(__name__)
 torch.set_grad_enabled(False)
-device = "cuda" if torch.to(xm.xla_device()).is_available() else "cpu"
+device = "cuda" if torch.cuda.is_available() else "cpu"
 
 
 def split_text(text: str, n=100, character=" ") -> List[str]:
@@ -49,7 +49,6 @@ def main(
     processing_args: "ProcessingArguments",
     index_hnsw_args: "IndexHnswArguments",
 ):
-
     ######################################
     logger.info("Step 1 - Create the dataset")
     ######################################
@@ -66,7 +65,7 @@ def main(
         "csv", data_files=[rag_example_args.csv_path], split="train", delimiter="\t", column_names=["title", "text"]
     )
 
-    # More info about loading csv files in the documentation: https://huggingface.co/docs/datasets/loading_datasets.html?highlight=csv#csv-files
+    # More info about loading csv files in the documentation: https://huggingface.co/docs/datasets/loading_datasets?highlight=csv#csv-files
 
     # Then split the documents into passages of 100 words
     dataset = dataset.map(split_documents, batched=True, num_proc=processing_args.num_proc)
@@ -121,7 +120,10 @@ class RagExampleArguments:
     dpr_ctx_encoder_model_name: str = field(
         default="facebook/dpr-ctx_encoder-multiset-base",
         metadata={
-            "help": "The DPR context encoder model to use. Either 'facebook/dpr-ctx_encoder-single-nq-base' or 'facebook/dpr-ctx_encoder-multiset-base'"
+            "help": (
+                "The DPR context encoder model to use. Either 'facebook/dpr-ctx_encoder-single-nq-base' or"
+                " 'facebook/dpr-ctx_encoder-multiset-base'"
+            )
         },
     )
     output_dir: Optional[str] = field(
@@ -155,7 +157,9 @@ class IndexHnswArguments:
     m: int = field(
         default=128,
         metadata={
-            "help": "The number of bi-directional links created for every new element during the HNSW index construction."
+            "help": (
+                "The number of bi-directional links created for every new element during the HNSW index construction."
+            )
         },
     )
 

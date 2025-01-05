@@ -15,114 +15,59 @@
 """
 Processor class for VisionTextDualEncoder
 """
-from typing import Union
 
-from transformers import PreTrainedTokenizer, PreTrainedTokenizerFast
-from transformers.feature_extraction_utils import FeatureExtractionMixin
+import warnings
 
+from ...processing_utils import ProcessorMixin
 from ...tokenization_utils_base import BatchEncoding
-from ..auto.feature_extraction_auto import AutoFeatureExtractor
-from ..auto.tokenization_auto import AutoTokenizer
 
 
-class VisionTextDualEncoderProcessor:
+class VisionTextDualEncoderProcessor(ProcessorMixin):
     r"""
-    Constructs a VisionTextDualEncoder processor which wraps a vision feature extractor and a tokenizer into a single
+    Constructs a VisionTextDualEncoder processor which wraps an image processor and a tokenizer into a single
     processor.
 
-    [`VisionTextDualEncoderProcessor`] offers all the functionalities of [`AutoFeatureExtractor`] and
-    [`AutoTokenizer`]. See the [`~VisionTextDualEncoderProcessor.__call__`] and
-    [`~VisionTextDualEncoderProcessor.decode`] for more information.
+    [`VisionTextDualEncoderProcessor`] offers all the functionalities of [`AutoImageProcessor`] and [`AutoTokenizer`].
+    See the [`~VisionTextDualEncoderProcessor.__call__`] and [`~VisionTextDualEncoderProcessor.decode`] for more
+    information.
 
     Args:
-        feature_extractor ([`AutoFeatureExtractor`]):
-            The feature extractor is a required input.
-        tokenizer ([`PreTrainedTokenizer`]):
+        image_processor ([`AutoImageProcessor`], *optional*):
+            The image processor is a required input.
+        tokenizer ([`PreTrainedTokenizer`], *optional*):
             The tokenizer is a required input.
     """
 
-    def __init__(
-        self, feature_extractor: FeatureExtractionMixin, tokenizer: Union[PreTrainedTokenizer, PreTrainedTokenizerFast]
-    ):
-        if not isinstance(feature_extractor, FeatureExtractionMixin):
-            raise ValueError(
-                f"`feature_extractor` has to be of type {FeatureExtractionMixin.__class__}, but is {type(feature_extractor)}"
+    attributes = ["image_processor", "tokenizer"]
+    image_processor_class = "AutoImageProcessor"
+    tokenizer_class = "AutoTokenizer"
+
+    def __init__(self, image_processor=None, tokenizer=None, **kwargs):
+        feature_extractor = None
+        if "feature_extractor" in kwargs:
+            warnings.warn(
+                "The `feature_extractor` argument is deprecated and will be removed in v5, use `image_processor`"
+                " instead.",
+                FutureWarning,
             )
-        if not isinstance(tokenizer, (PreTrainedTokenizer, PreTrainedTokenizerFast)):
-            raise ValueError(
-                f"`tokenizer` has to be of type `PreTrainedTokenizer` or `PreTrainedTokenizerFast`, but is {type(tokenizer)}"
-            )
+            feature_extractor = kwargs.pop("feature_extractor")
 
-        self.feature_extractor = feature_extractor
-        self.tokenizer = tokenizer
-        self.current_processor = self.feature_extractor
+        image_processor = image_processor if image_processor is not None else feature_extractor
+        if image_processor is None:
+            raise ValueError("You have to specify an image_processor.")
+        if tokenizer is None:
+            raise ValueError("You have to specify a tokenizer.")
 
-    def save_pretrained(self, save_directory):
-        """
-        Save a VisionTextDualEncoder feature extractor object and VisionTextDualEncoder tokenizer object to the
-        directory `save_directory`, so that it can be re-loaded using the
-        [`~VisionTextDualEncoderProcessor.from_pretrained`] class method.
-
-        <Tip>
-
-        This class method is simply calling [`~PreTrainedFeatureExtractor.save_pretrained`] and
-        [`~tokenization_utils_base.PreTrainedTokenizer.save_pretrained`]. Please refer to the docstrings of the methods
-        above for more information.
-
-        </Tip>
-
-        Args:
-            save_directory (`str` or `os.PathLike`):
-                Directory where the feature extractor JSON file and the tokenizer files will be saved (directory will
-                be created if it does not exist).
-        """
-        self.feature_extractor._set_processor_class(self.__class__.__name__)
-        self.feature_extractor.save_pretrained(save_directory)
-
-        self.tokenizer._set_processor_class(self.__class__.__name__)
-        self.tokenizer.save_pretrained(save_directory)
-
-    @classmethod
-    def from_pretrained(cls, pretrained_model_name_or_path, **kwargs):
-        r"""
-        Instantiate a [`VisionTextDualEncoderProcessor`] from a pretrained VisionTextDualEncoder processor.
-
-        <Tip>
-
-        This class method is simply calling AutoFeatureExtractor's [`~PreTrainedFeatureExtractor.from_pretrained`] and
-        AutoTokenizer's [`~tokenization_utils_base.PreTrainedTokenizer.from_pretrained`]. Please refer to the
-        docstrings of the methods above for more information.
-
-        </Tip>
-
-        Args:
-            pretrained_model_name_or_path (`str` or `os.PathLike`):
-                This can be either:
-
-                - a string, the *model id* of a pretrained feature_extractor hosted inside a model repo on
-                  huggingface.co. Valid model ids can be located at the root-level, like `bert-base-uncased`, or
-                  namespaced under a user or organization name, like `dbmdz/bert-base-german-cased`.
-                - a path to a *directory* containing a feature extractor file saved using the
-                  [`~PreTrainedFeatureExtractor.save_pretrained`] method, e.g., `./my_model_directory/`.
-                - a path or url to a saved feature extractor JSON *file*, e.g.,
-                  `./my_model_directory/preprocessor_config.json`.
-
-            **kwargs
-                Additional keyword arguments passed along to both [`PreTrainedFeatureExtractor`] and
-                [`PreTrainedTokenizer`]
-        """
-        feature_extractor = AutoFeatureExtractor.from_pretrained(pretrained_model_name_or_path, **kwargs)
-        tokenizer = AutoTokenizer.from_pretrained(pretrained_model_name_or_path, **kwargs)
-
-        return cls(feature_extractor=feature_extractor, tokenizer=tokenizer)
+        super().__init__(image_processor, tokenizer)
+        self.current_processor = self.image_processor
 
     def __call__(self, text=None, images=None, return_tensors=None, **kwargs):
         """
         Main method to prepare for the model one or several sequences(s) and image(s). This method forwards the `text`
         and `kwargs` arguments to VisionTextDualEncoderTokenizer's [`~PreTrainedTokenizer.__call__`] if `text` is not
-        `None` to encode the text. To prepare the image(s), this method forwards the `images` and `kwrags` arguments to
-        AutoFeatureExtractor's [`~AutoFeatureExtractor.__call__`] if `images` is not `None`. Please refer to the
-        doctsring of the above two methods for more information.
+        `None` to encode the text. To prepare the image(s), this method forwards the `images` and `kwargs` arguments to
+        AutoImageProcessor's [`~AutoImageProcessor.__call__`] if `images` is not `None`. Please refer to the doctsring
+        of the above two methods for more information.
 
         Args:
             text (`str`, `List[str]`, `List[List[str]]`):
@@ -131,10 +76,9 @@ class VisionTextDualEncoderProcessor:
                 `is_split_into_words=True` (to lift the ambiguity with a batch of sequences).
             images (`PIL.Image.Image`, `np.ndarray`, `torch.Tensor`, `List[PIL.Image.Image]`, `List[np.ndarray]`, `List[torch.Tensor]`):
                 The image or batch of images to be prepared. Each image can be a PIL image, NumPy array or PyTorch
-                tensor. In case of a NumPy array/PyTorch tensor, each image should be of shape (C, H, W), where C is a
-                number of channels, H and W are image height and width.
+                tensor. Both channels-first and channels-last formats are supported.
 
-            return_tensors (`str` or [`~file_utils.TensorType`], *optional*):
+            return_tensors (`str` or [`~utils.TensorType`], *optional*):
                 If set, will return tensors of a particular framework. Acceptable values are:
 
                 - `'tf'`: Return TensorFlow `tf.constant` objects.
@@ -159,7 +103,7 @@ class VisionTextDualEncoderProcessor:
             encoding = self.tokenizer(text, return_tensors=return_tensors, **kwargs)
 
         if images is not None:
-            image_features = self.feature_extractor(images, return_tensors=return_tensors, **kwargs)
+            image_features = self.image_processor(images, return_tensors=return_tensors, **kwargs)
 
         if text is not None and images is not None:
             encoding["pixel_values"] = image_features.pixel_values
@@ -182,3 +126,28 @@ class VisionTextDualEncoderProcessor:
         Please refer to the docstring of this method for more information.
         """
         return self.tokenizer.decode(*args, **kwargs)
+
+    @property
+    def model_input_names(self):
+        tokenizer_input_names = self.tokenizer.model_input_names
+        image_processor_input_names = self.image_processor.model_input_names
+        return list(dict.fromkeys(tokenizer_input_names + image_processor_input_names))
+
+    @property
+    def feature_extractor_class(self):
+        warnings.warn(
+            "`feature_extractor_class` is deprecated and will be removed in v5. Use `image_processor_class` instead.",
+            FutureWarning,
+        )
+        return self.image_processor_class
+
+    @property
+    def feature_extractor(self):
+        warnings.warn(
+            "`feature_extractor` is deprecated and will be removed in v5. Use `image_processor` instead.",
+            FutureWarning,
+        )
+        return self.image_processor
+
+
+__all__ = ["VisionTextDualEncoderProcessor"]

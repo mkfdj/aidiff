@@ -16,6 +16,7 @@
 Preprocessing script before training the distilled model.
 Specific to RoBERTa -> DistilRoBERTa and GPT2 -> DistilGPT2.
 """
+
 import argparse
 
 import torch
@@ -25,7 +26,10 @@ from transformers import GPT2LMHeadModel, RobertaForMaskedLM
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Extraction some layers of the full RobertaForMaskedLM or GPT2LMHeadModel for Transfer Learned Distillation"
+        description=(
+            "Extraction some layers of the full RobertaForMaskedLM or GPT2LMHeadModel for Transfer Learned"
+            " Distillation"
+        )
     )
     parser.add_argument("--model_type", default="roberta", choices=["roberta", "gpt2"])
     parser.add_argument("--model_name", default="roberta-large", type=str)

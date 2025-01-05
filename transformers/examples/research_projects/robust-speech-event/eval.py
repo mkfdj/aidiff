@@ -24,7 +24,7 @@ def log_results(result: Dataset, args: Dict[str, str]):
     cer_result = cer.compute(references=result["target"], predictions=result["prediction"])
 
     # print & log results
-    result_str = f"WER: {wer_result}\n" f"CER: {cer_result}"
+    result_str = f"WER: {wer_result}\nCER: {cer_result}"
     print(result_str)
 
     with open(f"{dataset_id}_eval_results.txt", "w") as f:
@@ -36,7 +36,6 @@ def log_results(result: Dataset, args: Dict[str, str]):
         target_file = f"log_{dataset_id}_targets.txt"
 
         with open(pred_file, "w") as p, open(target_file, "w") as t:
-
             # mapping function to write output
             def write_to_file(batch, i):
                 p.write(f"{i}" + "\n")
@@ -66,7 +65,7 @@ def normalize_text(text: str) -> str:
 
 def main(args):
     # load dataset
-    dataset = load_dataset(args.dataset, args.config, split=args.split, use_auth_token=True)
+    dataset = load_dataset(args.dataset, args.config, split=args.split, token=True)
 
     # for testing: only process the first two examples as a test
     # dataset = dataset.select(range(10))
@@ -80,7 +79,7 @@ def main(args):
 
     # load eval pipeline
     if args.device is None:
-        args.device = 0 if torch.to(xm.xla_device()).is_available() else -1
+        args.device = 0 if torch.cuda.is_available() else -1
     asr = pipeline("automatic-speech-recognition", model=args.model_id, device=args.device)
 
     # map function to decode audio

@@ -16,96 +16,50 @@
 Processor class for ViLT.
 """
 
+import warnings
 from typing import List, Optional, Union
 
-from transformers import BertTokenizerFast
-
-from ...file_utils import TensorType
+from ...processing_utils import ProcessorMixin
 from ...tokenization_utils_base import BatchEncoding, PaddingStrategy, PreTokenizedInput, TextInput, TruncationStrategy
-from .feature_extraction_vilt import ViltFeatureExtractor
+from ...utils import TensorType
 
 
-class ViltProcessor:
+class ViltProcessor(ProcessorMixin):
     r"""
-    Constructs a ViLT processor which wraps a BERT tokenizer and ViLT feature extractor into a single processor.
+    Constructs a ViLT processor which wraps a BERT tokenizer and ViLT image processor into a single processor.
 
-    [`ViltProcessor`] offers all the functionalities of [`ViltFeatureExtractor`] and [`BertTokenizerFast`]. See the
+    [`ViltProcessor`] offers all the functionalities of [`ViltImageProcessor`] and [`BertTokenizerFast`]. See the
     docstring of [`~ViltProcessor.__call__`] and [`~ViltProcessor.decode`] for more information.
 
     Args:
-        feature_extractor (`ViltFeatureExtractor`):
-            An instance of [`ViltFeatureExtractor`]. The feature extractor is a required input.
-        tokenizer (`BertTokenizerFast`):
+        image_processor (`ViltImageProcessor`, *optional*):
+            An instance of [`ViltImageProcessor`]. The image processor is a required input.
+        tokenizer (`BertTokenizerFast`, *optional*):
             An instance of ['BertTokenizerFast`]. The tokenizer is a required input.
     """
 
-    def __init__(self, feature_extractor, tokenizer):
-        if not isinstance(feature_extractor, ViltFeatureExtractor):
-            raise ValueError(
-                f"`feature_extractor` has to be of type {ViltFeatureExtractor.__class__}, but is {type(feature_extractor)}"
+    attributes = ["image_processor", "tokenizer"]
+    image_processor_class = "ViltImageProcessor"
+    tokenizer_class = ("BertTokenizer", "BertTokenizerFast")
+
+    def __init__(self, image_processor=None, tokenizer=None, **kwargs):
+        feature_extractor = None
+        if "feature_extractor" in kwargs:
+            warnings.warn(
+                "The `feature_extractor` argument is deprecated and will be removed in v5, use `image_processor`"
+                " instead.",
+                FutureWarning,
             )
-        if not isinstance(tokenizer, BertTokenizerFast):
-            raise ValueError(f"`tokenizer` has to be of type {BertTokenizerFast.__class__}, but is {type(tokenizer)}")
+            feature_extractor = kwargs.pop("feature_extractor")
 
-        self.feature_extractor = feature_extractor
-        self.tokenizer = tokenizer
-        self.current_processor = self.feature_extractor
+        image_processor = image_processor if image_processor is not None else feature_extractor
+        if image_processor is None:
+            raise ValueError("You need to specify an `image_processor`.")
+        if tokenizer is None:
+            raise ValueError("You need to specify a `tokenizer`.")
 
-    def save_pretrained(self, save_directory):
-        """
-        Save a ViLT feature_extractor object and BERT tokenizer object to the directory `save_directory`, so that it
-        can be re-loaded using the [`~ViltProcessor.from_pretrained`] class method.
-
-        <Tip>
-
-        This class method is simply calling [`~feature_extraction_utils.FeatureExtractionMixin.save_pretrained`] and
-        [`~tokenization_utils_base.PreTrainedTokenizer.save_pretrained`]. Please refer to the docstrings of the methods
-        above for more information.
-
-        </Tip>
-
-        Args:
-            save_directory (`str` or `os.PathLike`):
-                Directory where the feature extractor JSON file and the tokenizer files will be saved (directory will
-                be created if it does not exist).
-        """
-
-        self.feature_extractor.save_pretrained(save_directory)
-        self.tokenizer.save_pretrained(save_directory)
-
-    @classmethod
-    def from_pretrained(cls, pretrained_model_name_or_path, **kwargs):
-        r"""
-        Instantiate a [`ViltProcessor`] from a pretrained ViLT processor.
-
-        <Tip>
-
-        This class method is simply calling ViltFeatureExtractor's
-        [`~feature_extraction_utils.FeatureExtractionMixin.from_pretrained`] and BertTokenizerFast's
-        [`~tokenization_utils_base.PreTrainedTokenizer.from_pretrained`]. Please refer to the docstrings of the methods
-        above for more information.
-
-        </Tip>
-
-        Args:
-            pretrained_model_name_or_path (`str` or `os.PathLike`):
-                This can be either:
-
-                - a string, the *model id* of a pretrained feature_extractor hosted inside a model repo on
-                  huggingface.co. Valid model ids can be located at the root-level, like `bert-base-uncased`, or
-                  namespaced under a user or organization name, like `dbmdz/bert-base-german-cased`.
-                - a path to a *directory* containing a feature extractor file saved using the
-                  [`~SequenceFeatureExtractor.save_pretrained`] method, e.g., `./my_model_directory/`.
-                - a path or url to a saved feature extractor JSON *file*, e.g.,
-                  `./my_model_directory/preprocessor_config.json`.
-            **kwargs
-                Additional keyword arguments passed along to both [`SequenceFeatureExtractor`] and
-                [`PreTrainedTokenizer`]
-        """
-        feature_extractor = ViltFeatureExtractor.from_pretrained(pretrained_model_name_or_path, **kwargs)
-        tokenizer = BertTokenizerFast.from_pretrained(pretrained_model_name_or_path, **kwargs)
-
-        return cls(feature_extractor=feature_extractor, tokenizer=tokenizer)
+        super().__init__(image_processor, tokenizer)
+        self.current_processor = self.image_processor
 
     def __call__(
         self,
@@ -113,7 +67,7 @@ class ViltProcessor:
         text: Union[TextInput, PreTokenizedInput, List[TextInput], List[PreTokenizedInput]] = None,
         add_special_tokens: bool = True,
         padding: Union[bool, str, PaddingStrategy] = False,
-        truncation: Union[bool, str, TruncationStrategy] = False,
+        truncation: Union[bool, str, TruncationStrategy] = None,
         max_length: Optional[int] = None,
         stride: int = 0,
         pad_to_multiple_of: Optional[int] = None,
@@ -125,10 +79,10 @@ class ViltProcessor:
         return_length: bool = False,
         verbose: bool = True,
         return_tensors: Optional[Union[str, TensorType]] = None,
-        **kwargs
+        **kwargs,
     ) -> BatchEncoding:
         """
-        This method uses [`ViltFeatureExtractor.__call__`] method to prepare image(s) for the model, and
+        This method uses [`ViltImageProcessor.__call__`] method to prepare image(s) for the model, and
         [`BertTokenizerFast.__call__`] to prepare text for the model.
 
         Please refer to the docstring of the above two methods for more information.
@@ -152,8 +106,8 @@ class ViltProcessor:
             **kwargs,
         )
         # add pixel_values + pixel_mask
-        encoding_feature_extractor = self.feature_extractor(images, return_tensors=return_tensors)
-        encoding.update(encoding_feature_extractor)
+        encoding_image_processor = self.image_processor(images, return_tensors=return_tensors)
+        encoding.update(encoding_image_processor)
 
         return encoding
 
@@ -170,3 +124,28 @@ class ViltProcessor:
         the docstring of this method for more information.
         """
         return self.tokenizer.decode(*args, **kwargs)
+
+    @property
+    def model_input_names(self):
+        tokenizer_input_names = self.tokenizer.model_input_names
+        image_processor_input_names = self.image_processor.model_input_names
+        return list(dict.fromkeys(tokenizer_input_names + image_processor_input_names))
+
+    @property
+    def feature_extractor_class(self):
+        warnings.warn(
+            "`feature_extractor_class` is deprecated and will be removed in v5. Use `image_processor_class` instead.",
+            FutureWarning,
+        )
+        return self.image_processor_class
+
+    @property
+    def feature_extractor(self):
+        warnings.warn(
+            "`feature_extractor` is deprecated and will be removed in v5. Use `image_processor` instead.",
+            FutureWarning,
+        )
+        return self.image_processor
+
+
+__all__ = ["ViltProcessor"]

@@ -12,13 +12,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-""" Bertology: this script shows how you can explore the internals of the models in the library to:
-    - compute the entropy of the head attentions
-    - compute the importance of each head
-    - prune (remove) the low importance head.
-    Some parts of this script are adapted from the code of Michel et al. (http://arxiv.org/abs/1905.10650)
-    which is available at https://github.com/pmichel31415/are-16-heads-really-better-than-1
+"""Bertology: this script shows how you can explore the internals of the models in the library to:
+- compute the entropy of the head attentions
+- compute the importance of each head
+- prune (remove) the low importance head.
+Some parts of this script are adapted from the code of Michel et al. (http://arxiv.org/abs/1905.10650)
+which is available at https://github.com/pmichel31415/are-16-heads-really-better-than-1
 """
+
 import argparse
 import logging
 import os
@@ -26,7 +27,6 @@ from datetime import datetime
 
 import numpy as np
 import torch
-import torch_xla.core.xla_model as xm
 from torch import nn
 from torch.utils.data import DataLoader, SequentialSampler, Subset
 from torch.utils.data.distributed import DistributedSampler
@@ -219,9 +219,9 @@ def prune_heads(args, model, eval_dataloader, head_mask):
     original_time = datetime.now() - before_time
 
     original_num_params = sum(p.numel() for p in model.parameters())
-    heads_to_prune = dict(
-        (layer, (1 - head_mask[layer].long()).nonzero().squeeze().tolist()) for layer in range(len(head_mask))
-    )
+    heads_to_prune = {
+        layer: (1 - head_mask[layer].long()).nonzero().squeeze().tolist() for layer in range(len(head_mask))
+    }
 
     assert sum(len(h) for h in heads_to_prune.values()) == (1 - head_mask.long()).sum().item()
     model.prune_heads(heads_to_prune)
@@ -339,8 +339,10 @@ def main():
         "--max_seq_length",
         default=128,
         type=int,
-        help="The maximum total input sequence length after WordPiece tokenization. \n"
-        "Sequences longer than this will be truncated, sequences shorter padded.",
+        help=(
+            "The maximum total input sequence length after WordPiece tokenization. \n"
+            "Sequences longer than this will be truncated, sequences shorter padded."
+        ),
     )
     parser.add_argument("--batch_size", default=1, type=int, help="Batch size.")
 
@@ -359,19 +361,15 @@ def main():
         ptvsd.enable_attach(address=(args.server_ip, args.server_port), redirect_output=True)
         ptvsd.wait_for_attach()
 
- 
-
+    # Setup devices and distributed training
     if args.local_rank == -1 or args.no_cuda:
-    # Directly set the device to TPU
-      args.device = xm.xla_device()
-      args.n_gpu = 0  # No GPU when using TPU
+        args.device = torch.device("cuda" if torch.cuda.is_available() and not args.no_cuda else "cpu")
+        args.n_gpu = 0 if args.no_cuda else torch.cuda.device_count()
     else:
-    # Set the ordinal for distributed TPU training (if applicable)
-     xm.set_ordinal(args.local_rank)  # Set the ordinal for distributed training
-     args.device = xm.xla_device()  # Use TPU as the device
-     args.n_gpu = 1  # Treat TPU as a single device
-
-# Note: No need to initialize PyTorch distributed group for TPUs in this context
+        torch.cuda.set_device(args.local_rank)
+        args.device = torch.device("cuda", args.local_rank)
+        args.n_gpu = 1
+        torch.distributed.init_process_group(backend="nccl")  # Initializes the distributed backend
 
     # Setup logging
     logging.basicConfig(level=logging.INFO if args.local_rank in [-1, 0] else logging.WARN)

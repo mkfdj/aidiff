@@ -41,7 +41,7 @@ class TeacherModelArguments:
         default="This example is {}.",
         metadata={
             "help": (
-                "Template used to turn class names into mock hypotheses for teacher NLI model. Must include {{}}"
+                "Template used to turn class names into mock hypotheses for teacher NLI model. Must include {{}} "
                 "where class name is inserted."
             )
         },
@@ -53,7 +53,7 @@ class TeacherModelArguments:
         default=False,
         metadata={
             "help": (
-                "Allow multiple classes to be true rather than forcing them to sum to 1 (sometimes called"
+                "Allow multiple classes to be true rather than forcing them to sum to 1 (sometimes called "
                 "multi-class multi-label classification)."
             )
         },
@@ -98,7 +98,7 @@ class DistillTrainingArguments(TrainingArguments):
         default=True,
         metadata={
             "help": (
-                "Whether to evaluate the agreement of the final student predictions and the teacher predictions"
+                "Whether to evaluate the agreement of the final student predictions and the teacher predictions "
                 "after training."
             )
         },
@@ -107,7 +107,7 @@ class DistillTrainingArguments(TrainingArguments):
         default=0,
         metadata={
             "help": (
-                "Limit the total amount of checkpoints."
+                "Limit the total amount of checkpoints. "
                 "Deletes the older checkpoints in the output_dir. Default is 0 (no checkpoints)."
             )
         },
@@ -173,8 +173,8 @@ def get_teacher_predictions(
     """
     model = AutoModelForSequenceClassification.from_pretrained(model_path)
     model_config = model.config
-    if not no_cuda and torch.to(xm.xla_device()).is_available():
-        model = nn.DataParallel(model.to(xm.xla_device())())
+    if not no_cuda and torch.cuda.is_available():
+        model = nn.DataParallel(model.cuda())
         batch_size *= len(model.device_ids)
     tokenizer = AutoTokenizer.from_pretrained(model_path, use_fast=use_fast_tokenizer)
 
@@ -193,7 +193,7 @@ def get_teacher_predictions(
             return_tensors="pt",
         )
 
-        with torch.to(xm.xla_device()).amp.autocast(enabled=fp16):
+        with torch.cuda.amp.autocast(enabled=fp16):
             with torch.no_grad():
                 outputs = model(**encodings)
         logits.append(outputs.logits.detach().cpu().float())
@@ -303,7 +303,7 @@ def main():
         student_args.student_name_or_path, num_labels=len(class_names)
     )
     tokenizer = AutoTokenizer.from_pretrained(student_args.student_name_or_path, use_fast=data_args.use_fast_tokenizer)
-    model.config.id2label = {i: label for i, label in enumerate(class_names)}
+    model.config.id2label = dict(enumerate(class_names))
     model.config.label2id = {label: i for i, label in enumerate(class_names)}
 
     # 4. train student on teacher predictions

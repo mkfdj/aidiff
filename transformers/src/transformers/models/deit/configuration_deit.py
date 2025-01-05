@@ -12,18 +12,19 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-""" DeiT model configuration"""
+"""DeiT model configuration"""
+
+from collections import OrderedDict
+from typing import Mapping
+
+from packaging import version
 
 from ...configuration_utils import PretrainedConfig
+from ...onnx import OnnxConfig
 from ...utils import logging
 
 
 logger = logging.get_logger(__name__)
-
-DEIT_PRETRAINED_CONFIG_ARCHIVE_MAP = {
-    "facebook/deit-base-distilled-patch16-224": "https://huggingface.co/facebook/deit-base-patch16-224/resolve/main/config.json",
-    # See all DeiT models at https://huggingface.co/models?filter=deit
-}
 
 
 class DeiTConfig(PretrainedConfig):
@@ -50,38 +51,40 @@ class DeiTConfig(PretrainedConfig):
         hidden_act (`str` or `function`, *optional*, defaults to `"gelu"`):
             The non-linear activation function (function or string) in the encoder and pooler. If string, `"gelu"`,
             `"relu"`, `"selu"` and `"gelu_new"` are supported.
-        hidden_dropout_prob (`float`, *optional*, defaults to 0.1):
-            The dropout probabilitiy for all fully connected layers in the embeddings, encoder, and pooler.
-        attention_probs_dropout_prob (`float`, *optional*, defaults to 0.1):
+        hidden_dropout_prob (`float`, *optional*, defaults to 0.0):
+            The dropout probability for all fully connected layers in the embeddings, encoder, and pooler.
+        attention_probs_dropout_prob (`float`, *optional*, defaults to 0.0):
             The dropout ratio for the attention probabilities.
         initializer_range (`float`, *optional*, defaults to 0.02):
             The standard deviation of the truncated_normal_initializer for initializing all weight matrices.
         layer_norm_eps (`float`, *optional*, defaults to 1e-12):
             The epsilon used by the layer normalization layers.
-        image_size (`int`, *optional*, defaults to `224`):
+        image_size (`int`, *optional*, defaults to 224):
             The size (resolution) of each image.
-        patch_size (`int`, *optional*, defaults to `16`):
+        patch_size (`int`, *optional*, defaults to 16):
             The size (resolution) of each patch.
-        num_channels (`int`, *optional*, defaults to `3`):
+        num_channels (`int`, *optional*, defaults to 3):
             The number of input channels.
         qkv_bias (`bool`, *optional*, defaults to `True`):
             Whether to add a bias to the queries, keys and values.
-
+        encoder_stride (`int`, *optional*, defaults to 16):
+            Factor to increase the spatial resolution by in the decoder head for masked image modeling.
 
     Example:
 
     ```python
-    >>> from transformers import DeiTModel, DeiTConfig
+    >>> from transformers import DeiTConfig, DeiTModel
 
     >>> # Initializing a DeiT deit-base-distilled-patch16-224 style configuration
     >>> configuration = DeiTConfig()
 
-    >>> # Initializing a model from the deit-base-distilled-patch16-224 style configuration
+    >>> # Initializing a model (with random weights) from the deit-base-distilled-patch16-224 style configuration
     >>> model = DeiTModel(configuration)
 
     >>> # Accessing the model configuration
     >>> configuration = model.config
     ```"""
+
     model_type = "deit"
 
     def __init__(
@@ -95,12 +98,12 @@ class DeiTConfig(PretrainedConfig):
         attention_probs_dropout_prob=0.0,
         initializer_range=0.02,
         layer_norm_eps=1e-12,
-        is_encoder_decoder=False,
         image_size=224,
         patch_size=16,
         num_channels=3,
         qkv_bias=True,
-        **kwargs
+        encoder_stride=16,
+        **kwargs,
     ):
         super().__init__(**kwargs)
 
@@ -113,8 +116,27 @@ class DeiTConfig(PretrainedConfig):
         self.attention_probs_dropout_prob = attention_probs_dropout_prob
         self.initializer_range = initializer_range
         self.layer_norm_eps = layer_norm_eps
-
         self.image_size = image_size
         self.patch_size = patch_size
         self.num_channels = num_channels
         self.qkv_bias = qkv_bias
+        self.encoder_stride = encoder_stride
+
+
+class DeiTOnnxConfig(OnnxConfig):
+    torch_onnx_minimum_version = version.parse("1.11")
+
+    @property
+    def inputs(self) -> Mapping[str, Mapping[int, str]]:
+        return OrderedDict(
+            [
+                ("pixel_values", {0: "batch", 1: "num_channels", 2: "height", 3: "width"}),
+            ]
+        )
+
+    @property
+    def atol_for_validation(self) -> float:
+        return 1e-4
+
+
+__all__ = ["DeiTConfig", "DeiTOnnxConfig"]

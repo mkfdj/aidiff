@@ -13,7 +13,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-""" Reformer model configuration"""
+"""Reformer model configuration"""
 
 from ...configuration_utils import PretrainedConfig
 from ...utils import logging
@@ -21,16 +21,13 @@ from ...utils import logging
 
 logger = logging.get_logger(__name__)
 
-REFORMER_PRETRAINED_CONFIG_ARCHIVE_MAP = {
-    "google/reformer-crime-and-punishment": "https://huggingface.co/google/reformer-crime-and-punishment/resolve/main/config.json",
-    "google/reformer-enwik8": "https://huggingface.co/google/reformer-enwik8/resolve/main/config.json",
-}
-
 
 class ReformerConfig(PretrainedConfig):
     r"""
     This is the configuration class to store the configuration of a [`ReformerModel`]. It is used to instantiate a
-    Reformer model according to the specified arguments, defining the model architecture.
+    Reformer model according to the specified arguments, defining the model architecture. Instantiating a configuration
+    with the defaults will yield a similar configuration to that of the ReFormer
+    [google/reformer-crime-and-punishment](https://huggingface.co/google/reformer-crime-and-punishment) architecture.
 
     Configuration objects inherit from [`PretrainedConfig`] and can be used to control the model outputs. Read the
     documentation from [`PretrainedConfig`] for more information.
@@ -142,18 +139,19 @@ class ReformerConfig(PretrainedConfig):
     Examples:
 
     ```python
-    >>> from transformers import ReformerModel, ReformerConfig
+    >>> from transformers import ReformerConfig, ReformerModel
 
     >>> # Initializing a Reformer configuration
     >>> configuration = ReformerConfig()
 
-    >>> # Initializing a Reformer model
+    >>> # Initializing a Reformer model (with random weights)
     >>> model = ReformerModel(configuration)
 
     >>> # Accessing the model configuration
     >>> configuration = model.config
     ```
 """
+
     model_type = "reformer"
     keys_to_ignore_at_inference = ["past_buckets_states"]
     attribute_map = {}
@@ -193,7 +191,7 @@ class ReformerConfig(PretrainedConfig):
         tie_word_embeddings=False,
         use_cache=True,
         classifier_dropout=None,
-        **kwargs
+        **kwargs,
     ):
         self.hash_seed = hash_seed
         self.vocab_size = vocab_size
@@ -232,3 +230,6 @@ class ReformerConfig(PretrainedConfig):
             tie_word_embeddings=tie_word_embeddings,
             **kwargs,
         )
+
+
+__all__ = ["ReformerConfig"]

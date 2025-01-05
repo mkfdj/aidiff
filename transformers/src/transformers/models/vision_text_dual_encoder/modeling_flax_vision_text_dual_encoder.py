@@ -12,19 +12,18 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-""" Flax VisionTextDualEncoder model."""
-
+"""Flax VisionTextDualEncoder model."""
 
 from typing import Optional, Tuple
 
 import flax.linen as nn
 import jax
 import jax.numpy as jnp
-from flax.core.frozen_dict import FrozenDict
+from flax.core.frozen_dict import FrozenDict, freeze, unfreeze
+from flax.traverse_util import flatten_dict, unflatten_dict
 
-from ...file_utils import add_start_docstrings
 from ...modeling_flax_utils import FlaxPreTrainedModel, append_replace_return_docstrings, overwrite_call_docstring
-from ...utils import logging
+from ...utils import add_start_docstrings, logging
 from ..auto.configuration_auto import AutoConfig
 from ..auto.modeling_flax_auto import FLAX_MODEL_MAPPING, FlaxAutoModel
 from ..clip.modeling_flax_clip import FlaxCLIPOutput, FlaxCLIPVisionModel
@@ -52,9 +51,10 @@ VISION_TEXT_DUAL_ENCODER_START_DOCSTRING = r"""
     library implements for all its model (such as downloading or saving, resizing the input embeddings, pruning heads
     etc.)
 
-     This model is also a Flax Linen [flax.linen.Module](https://flax.readthedocs.io/en/latest/flax.linen.html#module)
-     subclass. Use it as a regular Flax linen Module and refer to the Flax documentation for all matter related to
-     general usage and behavior.
+     This model is also a
+     [flax.linen.Module](https://flax.readthedocs.io/en/latest/api_reference/flax.linen/module.html) subclass. Use it
+     as a regular Flax linen Module and refer to the Flax documentation for all matter related to general usage and
+     behavior.
 
     Finally, this model supports inherent JAX features such as:
 
@@ -88,7 +88,7 @@ VISION_TEXT_DUAL_ENCODER_INPUTS_DOCSTRING = r"""
             Indices of input sequence tokens in the vocabulary. Padding will be ignored by default should you provide
             it.
 
-            Indices can be obtained using [`PreTrainedTokenizer`]. See [`PreTrainedTokenizer.encode`] and
+            Indices can be obtained using [`AutoTokenizer`]. See [`PreTrainedTokenizer.encode`] and
             [`PreTrainedTokenizer.__call__`] for details.
 
             [What are input IDs?](../glossary#input-ids)
@@ -106,8 +106,8 @@ VISION_TEXT_DUAL_ENCODER_INPUTS_DOCSTRING = r"""
             [What are position IDs?](../glossary#position-ids)
         pixel_values (`torch.FloatTensor` of shape `(batch_size, num_channels, height, width)`):
             Pixel values. Padding will be ignored by default should you provide it. Pixel values can be obtained using
-            a feature extractor (e.g. if you use ViT as the encoder, you should use [`ViTFeatureExtractor`]). See
-            [`ViTFeatureExtractor.__call__`] for details.
+            an image processor (e.g. if you use ViT as the encoder, you should use [`AutoImageProcessor`]). See
+            [`ViTImageProcessor.__call__`] for details.
         output_attentions (`bool`, *optional*):
             Whether or not to return the attentions tensors of all attention layers. See `attentions` under returned
             tensors for more detail.
@@ -115,7 +115,7 @@ VISION_TEXT_DUAL_ENCODER_INPUTS_DOCSTRING = r"""
             Whether or not to return the hidden states of all layers. See `hidden_states` under returned tensors for
             more detail.
         return_dict (`bool`, *optional*):
-            Whether or not to return a [`~file_utils.ModelOutput`] instead of a plain tuple.
+            Whether or not to return a [`~utils.ModelOutput`] instead of a plain tuple.
 """
 
 
@@ -226,15 +226,21 @@ class FlaxVisionTextDualEncoderModel(FlaxPreTrainedModel):
         input_shape: Optional[Tuple] = None,
         seed: int = 0,
         dtype: jnp.dtype = jnp.float32,
-        **kwargs
+        _do_init: bool = True,
+        **kwargs,
     ):
+        if not _do_init:
+            raise ValueError(
+                "`FlaxVisionTextDualEncoderModel` cannot be created without initializing, `_do_init` must be `True`."
+            )
+
         if input_shape is None:
             input_shape = ((1, 1), (1, config.vision_config.image_size, config.vision_config.image_size, 3))
 
         module = self.module_class(config=config, dtype=dtype, **kwargs)
         super().__init__(config, module, input_shape=input_shape, seed=seed, dtype=dtype)
 
-    def init_weights(self, rng: jax.random.PRNGKey, input_shape: Tuple) -> FrozenDict:
+    def init_weights(self, rng: jax.random.PRNGKey, input_shape: Tuple, params: FrozenDict = None) -> FrozenDict:
         # init input tensor
         input_ids = jnp.zeros(input_shape[0], dtype="i4")
         position_ids = jnp.broadcast_to(jnp.arange(jnp.atleast_2d(input_ids).shape[-1]), input_shape[0])
@@ -246,7 +252,19 @@ class FlaxVisionTextDualEncoderModel(FlaxPreTrainedModel):
         params_rng, dropout_rng = jax.random.split(rng)
         rngs = {"params": params_rng, "dropout": dropout_rng}
 
-        return self.module.init(rngs, input_ids, pixel_values, attention_mask, position_ids, token_type_ids)["params"]
+        random_params = self.module.init(rngs, input_ids, pixel_values, attention_mask, position_ids, token_type_ids)[
+            "params"
+        ]
+
+        if params is not None:
+            random_params = flatten_dict(unfreeze(random_params))
+            params = flatten_dict(unfreeze(params))
+            for missing_key in self._missing_keys:
+                params[missing_key] = random_params[missing_key]
+            self._missing_keys = set()
+            return freeze(unflatten_dict(params))
+        else:
+            return random_params
 
     def __call__(
         self,
@@ -407,8 +425,6 @@ class FlaxVisionTextDualEncoderModel(FlaxPreTrainedModel):
                 Information necessary to initiate the vision model. Can be either:
 
                     - A string, the *model id* of a pretrained model hosted inside a model repo on huggingface.co.
-                      Valid model ids can be located at the root-level, like `bert-base-uncased`, or namespaced under a
-                      user or organization name, like `dbmdz/bert-base-german-cased`.
                     - A path to a *directory* containing model weights saved using
                       [`~FlaxPreTrainedModel.save_pretrained`], e.g., `./my_model_directory/`.
                     - A path or url to a *PyTorch checkpoint folder* (e.g, `./pt_model`). In this case, `from_pt`
@@ -420,8 +436,6 @@ class FlaxVisionTextDualEncoderModel(FlaxPreTrainedModel):
                 Information necessary to initiate the text model. Can be either:
 
                     - A string, the *model id* of a pretrained model hosted inside a model repo on huggingface.co.
-                      Valid model ids can be located at the root-level, like `bert-base-uncased`, or namespaced under a
-                      user or organization name, like `dbmdz/bert-base-german-cased`.
                     - A path to a *directory* containing model weights saved using
                       [`~FlaxPreTrainedModel.save_pretrained`], e.g., `./my_model_directory/`.
                     - A path or url to a *PyTorch checkpoint folder* (e.g, `./pt_model`). In this case, `from_pt`
@@ -449,7 +463,7 @@ class FlaxVisionTextDualEncoderModel(FlaxPreTrainedModel):
 
         >>> # initialize a model from pretrained ViT and BERT models. Note that the projection layers will be randomly initialized.
         >>> model = FlaxVisionTextDualEncoderModel.from_vision_text_pretrained(
-        ...     "google/vit-base-patch16-224", "bert-base-uncased"
+        ...     "google/vit-base-patch16-224", "google-bert/bert-base-uncased"
         ... )
         >>> # saving model after fine-tuning
         >>> model.save_pretrained("./vit-bert")
@@ -517,9 +531,9 @@ class FlaxVisionTextDualEncoderModel(FlaxPreTrainedModel):
         # the projection layers are always newly initialized when loading the model
         # using pre-trained vision and text model.
         logger.warning(
-            "The projection layer and logit scale weights `[('visual_projection', 'kernel'), ('text_projection', 'kernel'), ('logit_scale',)]` "
-            "are newly initialized. You should probably TRAIN this model on a down-stream task "
-            "to be able to use it for predictions and inference."
+            "The projection layer and logit scale weights `[('visual_projection', 'kernel'), ('text_projection',"
+            " 'kernel'), ('logit_scale',)]` are newly initialized. You should probably TRAIN this model on a"
+            " down-stream task to be able to use it for predictions and inference."
         )
 
         return model
@@ -537,15 +551,15 @@ VISION_TEXT_DUAL_ENCODER_MODEL_DOCSTRING = r"""
     >>> from transformers import (
     ...     FlaxVisionTextDualEncoderModel,
     ...     VisionTextDualEncoderProcessor,
-    ...     ViTFeatureExtractor,
-    ...     BertTokenizer,
+    ...     AutoImageProcessor,
+    ...     AutoTokenizer,
     ... )
 
-    >>> tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
-    >>> feature_extractor = ViTFeatureExtractor.from_pretrained("google/vit-base-patch16-224")
-    >>> processor = VisionTextDualEncoderProcessor(feature_extractor, tokenizer)
+    >>> tokenizer = AutoTokenizer.from_pretrained("google-bert/bert-base-uncased")
+    >>> image_processor = AutoImageProcesor.from_pretrained("google/vit-base-patch16-224")
+    >>> processor = VisionTextDualEncoderProcessor(image_processor, tokenizer)
     >>> model = FlaxVisionTextDualEncoderModel.from_vision_text_pretrained(
-    ...     "google/vit-base-patch16-224", "bert-base-uncased"
+    ...     "google/vit-base-patch16-224", "google-bert/bert-base-uncased"
     ... )
 
     >>> # contrastive training
@@ -582,3 +596,6 @@ overwrite_call_docstring(
 append_replace_return_docstrings(
     FlaxVisionTextDualEncoderModel, output_type=FlaxCLIPOutput, config_class=_CONFIG_FOR_DOC
 )
+
+
+__all__ = ["FlaxVisionTextDualEncoderModel"]

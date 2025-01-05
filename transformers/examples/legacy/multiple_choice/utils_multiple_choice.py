@@ -13,8 +13,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-""" Multiple choice fine-tuning: utilities to work with multiple choice tasks of reading comprehension """
-
+"""Multiple choice fine-tuning: utilities to work with multiple choice tasks of reading comprehension"""
 
 import csv
 import glob
@@ -26,8 +25,8 @@ from enum import Enum
 from typing import List, Optional
 
 import tqdm
-
 from filelock import FileLock
+
 from transformers import PreTrainedTokenizer, is_tf_available, is_torch_available
 
 
@@ -112,7 +111,6 @@ if is_torch_available():
             # and the others will use the cache.
             lock_path = cached_features_file + ".lock"
             with FileLock(lock_path):
-
                 if os.path.exists(cached_features_file) and not overwrite_cache:
                     logger.info(f"Loading features from cached file {cached_features_file}")
                     self.features = torch.load(cached_features_file)
@@ -182,7 +180,7 @@ if is_tf_available():
             )
 
             def gen():
-                for (ex_index, ex) in tqdm.tqdm(enumerate(self.features), desc="convert examples to features"):
+                for ex_index, ex in tqdm.tqdm(enumerate(self.features), desc="convert examples to features"):
                     if ex_index % 10000 == 0:
                         logger.info("Writing example %d of %d" % (ex_index, len(examples)))
 
@@ -297,7 +295,7 @@ class RaceProcessor(DataProcessor):
     def _create_examples(self, lines, set_type):
         """Creates examples for the training and dev sets."""
         examples = []
-        for (_, data_raw) in enumerate(lines):
+        for _, data_raw in enumerate(lines):
             race_id = "%s-%s" % (set_type, data_raw["race_id"])
             article = data_raw["article"]
             for i in range(len(data_raw["answers"])):
@@ -380,7 +378,7 @@ class SwagProcessor(DataProcessor):
         """See base class."""
         logger.info("LOOKING AT {} dev".format(data_dir))
         raise ValueError(
-            "For swag testing, the input file does not contain a label column. It can not be tested in current code"
+            "For swag testing, the input file does not contain a label column. It can not be tested in current code "
             "setting!"
         )
         return self._create_examples(self._read_csv(os.path.join(data_dir, "test.csv")), "test")
@@ -518,7 +516,7 @@ def convert_examples_to_features(
     label_map = {label: i for i, label in enumerate(label_list)}
 
     features = []
-    for (ex_index, example) in tqdm.tqdm(enumerate(examples), desc="convert examples to features"):
+    for ex_index, example in tqdm.tqdm(enumerate(examples), desc="convert examples to features"):
         if ex_index % 10000 == 0:
             logger.info("Writing example %d of %d" % (ex_index, len(examples)))
         choices_inputs = []
@@ -542,7 +540,7 @@ def convert_examples_to_features(
             if "num_truncated_tokens" in inputs and inputs["num_truncated_tokens"] > 0:
                 logger.info(
                     "Attention! you are cropping tokens (swag task is ok). "
-                    "If you are training ARC and RACE and you are poping question + options,"
+                    "If you are training ARC and RACE and you are poping question + options, "
                     "you need to try to use a bigger max seq length!"
                 )
 

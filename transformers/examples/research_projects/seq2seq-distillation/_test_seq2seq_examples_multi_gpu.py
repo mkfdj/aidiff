@@ -10,7 +10,7 @@ from transformers.testing_utils import TestCasePlus, execute_subprocess_async, r
 from utils import load_json
 
 
-CUDA_AVAILABLE = torch.to(xm.xla_device()).is_available()
+CUDA_AVAILABLE = torch.cuda.is_available()
 ARTICLES = [" Sam ate lunch today.", "Sams lunch ingredients."]
 SUMMARIES = ["A very interesting story about what I ate for lunch.", "Avocado, celery, turkey, coffee"]
 CHEAP_ARGS = {
@@ -98,30 +98,29 @@ class TestSummarizationDistillerMultiGPU(TestCasePlus):
 
     @require_torch_multi_gpu
     def test_multi_gpu(self):
-
-        updates = dict(
-            no_teacher=True,
-            freeze_encoder=True,
-            gpus=2,
-            overwrite_output_dir=True,
-            sortish_sampler=True,
-        )
+        updates = {
+            "no_teacher": True,
+            "freeze_encoder": True,
+            "gpus": 2,
+            "overwrite_output_dir": True,
+            "sortish_sampler": True,
+        }
         self._test_distiller_cli_fork(updates, check_contents=False)
 
     def _test_distiller_cli_fork(self, updates, check_contents=True):
-        default_updates = dict(
-            label_smoothing=0.0,
-            early_stopping_patience=-1,
-            train_batch_size=1,
-            eval_batch_size=2,
-            max_epochs=2,
-            alpha_mlm=0.2,
-            alpha_ce=0.8,
-            do_predict=True,
-            model_name_or_path="sshleifer/tinier_bart",
-            teacher=CHEAP_ARGS["model_name_or_path"],
-            val_check_interval=0.5,
-        )
+        default_updates = {
+            "label_smoothing": 0.0,
+            "early_stopping_patience": -1,
+            "train_batch_size": 1,
+            "eval_batch_size": 2,
+            "max_epochs": 2,
+            "alpha_mlm": 0.2,
+            "alpha_ce": 0.8,
+            "do_predict": True,
+            "model_name_or_path": "sshleifer/tinier_bart",
+            "teacher": CHEAP_ARGS["model_name_or_path"],
+            "val_check_interval": 0.5,
+        }
         default_updates.update(updates)
         args_d: dict = CHEAP_ARGS.copy()
         tmp_dir = make_test_data_dir(tmp_dir=self.get_auto_remove_tmp_dir())

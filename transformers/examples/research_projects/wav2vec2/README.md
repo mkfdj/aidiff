@@ -1,5 +1,5 @@
 **NOTE**: This example is outdated and is not longer actively maintained. Please 
-follow the new instructions of fine-tuning Wav2Vec2 [here](https://github.com/huggingface/transformers/blob/master/examples/pytorch/speech-recognition/README.md)
+follow the new instructions of fine-tuning Wav2Vec2 [here](https://github.com/huggingface/transformers/blob/main/examples/pytorch/speech-recognition/README.md)
 
 ## Fine-tuning Wav2Vec2
 
@@ -18,7 +18,7 @@ python run_asr.py \
 --num_train_epochs="30" \
 --per_device_train_batch_size="20" \
 --per_device_eval_batch_size="20" \
---evaluation_strategy="steps" \
+--eval_strategy="steps" \
 --save_steps="500" \
 --eval_steps="100" \
 --logging_steps="50" \
@@ -73,7 +73,7 @@ python run_asr.py \
 --per_device_train_batch_size="1" \
 --per_device_eval_batch_size="1" \
 --gradient_accumulation_steps="8" \
---evaluation_strategy="steps" \
+--eval_strategy="steps" \
 --save_steps="500" \
 --eval_steps="100" \
 --logging_steps="50" \
@@ -131,10 +131,10 @@ which helps with capping GPU memory usage.
 
 ### DeepSpeed Integration
 
-To learn how to deploy Deepspeed Integration please refer to [this guide](https://huggingface.co/transformers/master/main_classes/deepspeed.html#deepspeed-trainer-integration).
+To learn how to deploy Deepspeed Integration please refer to [this guide](https://huggingface.co/transformers/main/main_classes/deepspeed.html#deepspeed-trainer-integration).
 
 But to get started quickly all you need is to install:
-```
+```bash
 pip install deepspeed
 ```
 and then use the default configuration files in this directory:
@@ -148,11 +148,11 @@ Here are examples of how you can use DeepSpeed:
 
 ZeRO-2:
 
-```
+```bash
 PYTHONPATH=../../../src deepspeed --num_gpus 2 \
 run_asr.py \
 --output_dir=output_dir --num_train_epochs=2 --per_device_train_batch_size=2 \
---per_device_eval_batch_size=2 --evaluation_strategy=steps --save_steps=500 --eval_steps=100 \
+--per_device_eval_batch_size=2 --eval_strategy=steps --save_steps=500 --eval_steps=100 \
 --logging_steps=5 --learning_rate=5e-4 --warmup_steps=3000 \
 --model_name_or_path=patrickvonplaten/wav2vec2_tiny_random_robust \
 --dataset_name=hf-internal-testing/librispeech_asr_dummy --dataset_config_name=clean \
@@ -162,7 +162,7 @@ run_asr.py \
 ```
 
 For ZeRO-2 with more than 1 gpu you need to use (which is already in the example configuration file):
-```
+```json
     "zero_optimization": {
         ...
         "find_unused_parameters": true,
@@ -172,11 +172,11 @@ For ZeRO-2 with more than 1 gpu you need to use (which is already in the example
 
 ZeRO-3:
 
-```
+```bash
 PYTHONPATH=../../../src deepspeed --num_gpus 2 \
 run_asr.py \
 --output_dir=output_dir --num_train_epochs=2 --per_device_train_batch_size=2 \
---per_device_eval_batch_size=2 --evaluation_strategy=steps --save_steps=500 --eval_steps=100 \
+--per_device_eval_batch_size=2 --eval_strategy=steps --save_steps=500 --eval_steps=100 \
 --logging_steps=5 --learning_rate=5e-4 --warmup_steps=3000 \
 --model_name_or_path=patrickvonplaten/wav2vec2_tiny_random_robust \
 --dataset_name=hf-internal-testing/librispeech_asr_dummy --dataset_config_name=clean \
@@ -188,11 +188,11 @@ run_asr.py \
 ### Pretraining Wav2Vec2
 
 The `run_pretrain.py` script allows one to pretrain a Wav2Vec2 model from scratch using Wav2Vec2's contrastive loss objective (see official [paper](https://arxiv.org/abs/2006.11477) for more information). 
-It is recommended to pre-train Wav2Vec2 with Trainer + Deepspeed (please refer to [this guide](https://huggingface.co/transformers/master/main_classes/deepspeed.html#deepspeed-trainer-integration) for more information).
+It is recommended to pre-train Wav2Vec2 with Trainer + Deepspeed (please refer to [this guide](https://huggingface.co/transformers/main/main_classes/deepspeed.html#deepspeed-trainer-integration) for more information).
 
 Here is an example of how you can use DeepSpeed ZeRO-2 to pretrain a small Wav2Vec2 model:
 
-```
+```bash
 PYTHONPATH=../../../src deepspeed --num_gpus 4 run_pretrain.py \
 --output_dir="./wav2vec2-base-libri-100h" \
 --num_train_epochs="3" \
@@ -215,4 +215,35 @@ PYTHONPATH=../../../src deepspeed --num_gpus 4 run_pretrain.py \
 --verbose_logging \
 --fp16 \
 --deepspeed ds_config_wav2vec2_zero2.json \
+```
+
+
+### Forced Alignment
+
+Character level forced alignment for audio and text pairs with wav2vec2 models finetuned on ASR task for a specific language.
+Inspired by [this](https://pytorch.org/tutorials/intermediate/forced_alignment_with_torchaudio_tutorial.html) Pytorch tutorial.
+
+#### Input Formats
+
+    Input format in script.txt              Input format in wavs directroy
+    0000    sentence1                       0000.wav
+    0001    sentence2                       0001.wav
+    
+#### Output Format
+
+Output directory will contain 0000.txt and 0001.txt. Each file will have format like below
+
+    char    score   start_ms    end_ms
+    h       0.25    1440        1520
+    
+#### Run command
+
+```bash
+python alignment.py  \
+--model_name="arijitx/wav2vec2-xls-r-300m-bengali" \
+--wav_dir="./wavs"
+--text_file="script.txt" \
+--input_wavs_sr=48000 \
+--output_dir="./out_alignment" \
+--cuda
 ```

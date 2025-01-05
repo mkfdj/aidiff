@@ -16,16 +16,15 @@
 
 from typing import Callable, List, Optional, Tuple
 
-import numpy as np
-
 import flax
 import flax.linen as nn
 import jax
 import jax.numpy as jnp
-from flax.core.frozen_dict import FrozenDict
+import numpy as np
+from flax.core.frozen_dict import FrozenDict, freeze, unfreeze
 from flax.linen.attention import dot_product_attention_weights
+from flax.traverse_util import flatten_dict, unflatten_dict
 
-from ...file_utils import add_start_docstrings, add_start_docstrings_to_model_forward
 from ...modeling_flax_outputs import (
     FlaxBaseModelOutput,
     FlaxBaseModelOutputWithPooling,
@@ -38,6 +37,7 @@ from ...modeling_flax_utils import (
     append_replace_return_docstrings,
     overwrite_call_docstring,
 )
+from ...utils import add_start_docstrings, add_start_docstrings_to_model_forward
 from .configuration_beit import BeitConfig
 
 
@@ -69,9 +69,10 @@ BEIT_START_DOCSTRING = r"""
     This model inherits from [`FlaxPreTrainedModel`]. Check the superclass documentation for the generic methods the
     library implements for all its model (such as downloading, saving and converting weights from PyTorch models)
 
-    This model is also a Flax Linen [flax.linen.Module](https://flax.readthedocs.io/en/latest/flax.linen.html#module)
-    subclass. Use it as a regular Flax linen Module and refer to the Flax documentation for all matter related to
-    general usage and behavior.
+    This model is also a
+    [flax.linen.Module](https://flax.readthedocs.io/en/latest/api_reference/flax.linen/module.html) subclass. Use it as
+    a regular Flax linen Module and refer to the Flax documentation for all matter related to general usage and
+    behavior.
 
     Finally, this model supports inherent JAX features such as:
 
@@ -101,8 +102,8 @@ BEIT_START_DOCSTRING = r"""
 BEIT_INPUTS_DOCSTRING = r"""
     Args:
         pixel_values (`numpy.ndarray` of shape `(batch_size, num_channels, height, width)`):
-            Pixel values. Pixel values can be obtained using [`BeitFeatureExtractor`]. See
-            [`BeitFeatureExtractor.__call__`] for details.
+            Pixel values. Pixel values can be obtained using [`AutoImageProcessor`]. See
+            [`AutoImageProcessor.__call__`] for details.
 
         output_attentions (`bool`, *optional*):
             Whether or not to return the attentions tensors of all attention layers. See `attentions` under returned
@@ -111,7 +112,7 @@ BEIT_INPUTS_DOCSTRING = r"""
             Whether or not to return the hidden states of all layers. See `hidden_states` under returned tensors for
             more detail.
         return_dict (`bool`, *optional*):
-            Whether or not to return a [`~file_utils.ModelOutput`] instead of a plain tuple.
+            Whether or not to return a [`~utils.ModelOutput`] instead of a plain tuple.
 """
 
 
@@ -165,11 +166,11 @@ class FlaxBeitDropPath(nn.Module):
 
 
 class FlaxBeitPatchEmbeddings(nn.Module):
-
     config: BeitConfig
     dtype: jnp.dtype = jnp.float32  # the dtype of the computation
 
     def setup(self):
+        self.num_channels = self.config.num_channels
         image_size = self.config.image_size
         patch_size = self.config.patch_size
         num_patches = (image_size // patch_size) * (image_size // patch_size)
@@ -186,6 +187,11 @@ class FlaxBeitPatchEmbeddings(nn.Module):
         )
 
     def __call__(self, pixel_values):
+        num_channels = pixel_values.shape[-1]
+        if num_channels != self.num_channels:
+            raise ValueError(
+                "Make sure that the channel dimension of the pixel values match with the one set in the configuration."
+            )
         embeddings = self.projection(pixel_values)
         batch_size, _, _, channels = embeddings.shape
         return jnp.reshape(embeddings, (batch_size, -1, channels))
@@ -210,7 +216,6 @@ class FlaxBeitEmbeddings(nn.Module):
         self.dropout = nn.Dropout(rate=self.config.hidden_dropout_prob)
 
     def __call__(self, pixel_values, bool_masked_pos=None, deterministic=True):
-
         embeddings = self.patch_embeddings(pixel_values)
         batch_size, seq_len, _ = embeddings.shape
 
@@ -511,7 +516,6 @@ class FlaxBeitLayerCollection(nn.Module):
         output_hidden_states: bool = False,
         return_dict: bool = True,
     ):
-
         all_attentions = () if output_attentions else None
         all_hidden_states = () if output_hidden_states else None
 
@@ -552,7 +556,7 @@ class FlaxBeitEncoder(nn.Module):
             )
 
         # stochastic depth decay rule
-        drop_path_rates = [x for x in np.linspace(0, self.config.drop_path_rate, self.config.num_hidden_layers)]
+        drop_path_rates = list(np.linspace(0, self.config.drop_path_rate, self.config.num_hidden_layers))
         self.layer = FlaxBeitLayerCollection(
             self.config,
             window_size=self.window_size,
@@ -591,13 +595,21 @@ class FlaxBeitPreTrainedModel(FlaxPreTrainedModel):
     main_input_name = "pixel_values"
     module_class: nn.Module = None
 
-    def __init__(self, config: BeitConfig, input_shape=None, seed: int = 0, dtype: jnp.dtype = jnp.float32, **kwargs):
+    def __init__(
+        self,
+        config: BeitConfig,
+        input_shape=None,
+        seed: int = 0,
+        dtype: jnp.dtype = jnp.float32,
+        _do_init: bool = True,
+        **kwargs,
+    ):
         module = self.module_class(config=config, dtype=dtype, **kwargs)
         if input_shape is None:
-            input_shape = (1, config.image_size, config.image_size, 3)
-        super().__init__(config, module, input_shape=input_shape, seed=seed, dtype=dtype)
+            input_shape = (1, config.image_size, config.image_size, config.num_channels)
+        super().__init__(config, module, input_shape=input_shape, seed=seed, dtype=dtype, _do_init=_do_init)
 
-    def init_weights(self, rng: jax.random.PRNGKey, input_shape: Tuple) -> FrozenDict:
+    def init_weights(self, rng: jax.random.PRNGKey, input_shape: Tuple, params: FrozenDict = None) -> FrozenDict:
         # init input tensors
         pixel_values = jnp.zeros(input_shape, dtype=self.dtype)
 
@@ -605,7 +617,17 @@ class FlaxBeitPreTrainedModel(FlaxPreTrainedModel):
         dropout_rng, droppath_rng = jax.random.split(dropout_rng)
         rngs = {"params": params_rng, "dropout": dropout_rng, "droppath": droppath_rng}
 
-        return self.module.init(rngs, pixel_values, return_dict=False)["params"]
+        random_params = self.module.init(rngs, pixel_values, return_dict=False)["params"]
+
+        if params is not None:
+            random_params = flatten_dict(unfreeze(random_params))
+            params = flatten_dict(unfreeze(params))
+            for missing_key in self._missing_keys:
+                params[missing_key] = random_params[missing_key]
+            self._missing_keys = set()
+            return freeze(unflatten_dict(params))
+        else:
+            return random_params
 
     @add_start_docstrings_to_model_forward(BEIT_INPUTS_DOCSTRING.format("batch_size, sequence_length"))
     def __call__(
@@ -688,7 +710,6 @@ class FlaxBeitModule(nn.Module):
         output_hidden_states: bool = False,
         return_dict: bool = True,
     ):
-
         hidden_states = self.embeddings(pixel_values, bool_masked_pos, deterministic=deterministic)
 
         outputs = self.encoder(
@@ -731,17 +752,17 @@ FLAX_BEIT_MODEL_DOCSTRING = """
     Examples:
 
     ```python
-    >>> from transformers import BeitFeatureExtractor, FlaxBeitModel
+    >>> from transformers import AutoImageProcessor, FlaxBeitModel
     >>> from PIL import Image
     >>> import requests
 
     >>> url = "http://images.cocodataset.org/val2017/000000039769.jpg"
     >>> image = Image.open(requests.get(url, stream=True).raw)
 
-    >>> feature_extractor = BeitFeatureExtractor.from_pretrained("microsoft/beit-base-patch16-224-pt22k-ft22k")
+    >>> image_processor = AutoImageProcessor.from_pretrained("microsoft/beit-base-patch16-224-pt22k-ft22k")
     >>> model = FlaxBeitModel.from_pretrained("microsoft/beit-base-patch16-224-pt22k-ft22k")
 
-    >>> inputs = feature_extractor(images=image, return_tensors="np")
+    >>> inputs = image_processor(images=image, return_tensors="np")
     >>> outputs = model(**inputs)
     >>> last_hidden_states = outputs.last_hidden_state
     ```
@@ -811,24 +832,24 @@ class FlaxBeitForMaskedImageModeling(FlaxBeitPreTrainedModel):
 
 FLAX_BEIT_MLM_DOCSTRING = """
     bool_masked_pos (`numpy.ndarray` of shape `(batch_size, num_patches)`):
-            Boolean masked positions. Indicates which patches are masked (1) and which aren't (0).
+        Boolean masked positions. Indicates which patches are masked (1) and which aren't (0).
 
     Returns:
 
     Examples:
 
     ```python
-    >>> from transformers import BeitFeatureExtractor, BeitForMaskedImageModeling
+    >>> from transformers import AutoImageProcessor, BeitForMaskedImageModeling
     >>> from PIL import Image
     >>> import requests
 
     >>> url = "http://images.cocodataset.org/val2017/000000039769.jpg"
     >>> image = Image.open(requests.get(url, stream=True).raw)
 
-    >>> feature_extractor = BeitFeatureExtractor.from_pretrained("microsoft/beit-base-patch16-224-pt22k")
+    >>> image_processor = AutoImageProcessor.from_pretrained("microsoft/beit-base-patch16-224-pt22k")
     >>> model = BeitForMaskedImageModeling.from_pretrained("microsoft/beit-base-patch16-224-pt22k")
 
-    >>> inputs = feature_extractor(images=image, return_tensors="np")
+    >>> inputs = image_processor(images=image, return_tensors="np")
     >>> outputs = model(**inputs)
     >>> logits = outputs.logits
     ```
@@ -902,17 +923,17 @@ FLAX_BEIT_CLASSIF_DOCSTRING = """
     Example:
 
     ```python
-    >>> from transformers import BeitFeatureExtractor, FlaxBeitForImageClassification
+    >>> from transformers import AutoImageProcessor, FlaxBeitForImageClassification
     >>> from PIL import Image
     >>> import requests
 
     >>> url = "http://images.cocodataset.org/val2017/000000039769.jpg"
     >>> image = Image.open(requests.get(url, stream=True).raw)
 
-    >>> feature_extractor = BeitFeatureExtractor.from_pretrained("microsoft/beit-base-patch16-224")
+    >>> image_processor = AutoImageProcessor.from_pretrained("microsoft/beit-base-patch16-224")
     >>> model = FlaxBeitForImageClassification.from_pretrained("microsoft/beit-base-patch16-224")
 
-    >>> inputs = feature_extractor(images=image, return_tensors="np")
+    >>> inputs = image_processor(images=image, return_tensors="np")
     >>> outputs = model(**inputs)
     >>> logits = outputs.logits
     >>> # model predicts one of the 1000 ImageNet classes
@@ -925,3 +946,11 @@ overwrite_call_docstring(FlaxBeitForImageClassification, FLAX_BEIT_CLASSIF_DOCST
 append_replace_return_docstrings(
     FlaxBeitForImageClassification, output_type=FlaxSequenceClassifierOutput, config_class=BeitConfig
 )
+
+
+__all__ = [
+    "FlaxBeitForImageClassification",
+    "FlaxBeitForMaskedImageModeling",
+    "FlaxBeitModel",
+    "FlaxBeitPreTrainedModel",
+]

@@ -14,7 +14,6 @@
 # limitations under the License.
 """Convert Reformer checkpoint."""
 
-
 import argparse
 import pickle
 
@@ -203,15 +202,22 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     # Required parameters
     parser.add_argument(
-        "--trax_model_pkl_path", default=None, type=str, required=True, help="Path to the TensorFlow checkpoint path."
+        "--trax_model_pkl_path",
+        default=None,
+        type=str,
+        required=True,
+        help="Path to the TensorFlow checkpoint path.\n"
+        "Given the files are in the pickle format, please be wary of passing it files you trust.",
     )
     parser.add_argument(
         "--config_file",
         default=None,
         type=str,
         required=True,
-        help="The config json file corresponding to the pre-trained Reformer model. \n"
-        "This specifies the model architecture.",
+        help=(
+            "The config json file corresponding to the pre-trained Reformer model. \n"
+            "This specifies the model architecture."
+        ),
     )
     parser.add_argument(
         "--pytorch_dump_path", default=None, type=str, required=True, help="Path to the output PyTorch model."

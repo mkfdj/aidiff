@@ -30,10 +30,10 @@ from typing import List, Optional, Tuple, Union
 
 import numpy as np
 import torch
+from pplm_classification_head import ClassificationHead
 from torch import nn
 from tqdm import trange
 
-from pplm_classification_head import ClassificationHead
 from transformers import GPT2LMHeadModel, GPT2Tokenizer
 from transformers.file_utils import cached_path
 
@@ -61,7 +61,7 @@ DISCRIMINATOR_MODELS_PARAMS = {
         "embed_size": 1024,
         "class_vocab": {"non_clickbait": 0, "clickbait": 1},
         "default_class": 1,
-        "pretrained_model": "gpt2-medium",
+        "pretrained_model": "openai-community/gpt2-medium",
     },
     "sentiment": {
         "url": "https://s3.amazonaws.com/models.huggingface.co/bert/pplm/discriminators/SST_classifier_head.pt",
@@ -69,23 +69,9 @@ DISCRIMINATOR_MODELS_PARAMS = {
         "embed_size": 1024,
         "class_vocab": {"very_positive": 2, "very_negative": 3},
         "default_class": 3,
-        "pretrained_model": "gpt2-medium",
+        "pretrained_model": "openai-community/gpt2-medium",
     },
 }
-
-class Help_tokenizer:
-    def __init__(self, tokenizer):
-        self.tokenizer = tokenizer
-        self.tokenizer_rev = {v:k for k,v in tokenizer.items()}
-        self.bos_token = 'START'
-
-    def decode(self, encoded_text):
-        word_lst = [self.tokenizer_rev[x] for x in encoded_text]
-        return " ".join(word_lst)
-
-    def encode(self, text):
-        tokenized = [self.tokenizer.get(x, self.tokenizer['UNK']) for x in text.split()]
-        return tokenized
 
 
 def top_k_filter(logits, k, probs=False):
@@ -126,8 +112,6 @@ def perturb_past(
     device="cuda",
 ):
     # Generate inital perturbed past
-    past = [torch.stack(p, dim=0) for p in past]
-    # print(len(past), 'past', len(past[0]), )
     grad_accumulator = [(np.zeros(p.shape).astype("float32")) for p in past]
 
     if accumulated_hidden is None:
@@ -143,11 +127,9 @@ def perturb_past(
     _, _, _, curr_length, _ = past[0].shape
 
     if curr_length > window_length and window_length > 0:
-        ones_key_val_shape = tuple(past[0].shape[:-2]) + tuple([window_length]) + tuple(past[0].shape[-1:])
+        ones_key_val_shape = tuple(past[0].shape[:-2]) + (window_length,) + tuple(past[0].shape[-1:])
 
-        zeros_key_val_shape = (
-            tuple(past[0].shape[:-2]) + tuple([curr_length - window_length]) + tuple(past[0].shape[-1:])
-        )
+        zeros_key_val_shape = tuple(past[0].shape[:-2]) + (curr_length - window_length,) + tuple(past[0].shape[-1:])
 
         ones_mask = torch.ones(ones_key_val_shape)
         ones_mask = decay_mask * ones_mask.permute(0, 1, 2, 4, 3)
@@ -361,7 +343,7 @@ def full_text_generation(
     gm_scale=0.9,
     kl_scale=0.01,
     repetition_penalty=1.0,
-    **kwargs
+    **kwargs,
 ):
     classifier, class_id = get_classifier(discrim, class_label, device)
 
@@ -395,7 +377,7 @@ def full_text_generation(
         repetition_penalty=repetition_penalty,
     )
     if device == "cuda":
-        torch.to(xm.xla_device()).empty_cache()
+        torch.cuda.empty_cache()
 
     pert_gen_tok_texts = []
     discrim_losses = []
@@ -433,7 +415,7 @@ def full_text_generation(
         losses_in_time.append(loss_in_time)
 
     if device == "cuda":
-        torch.to(xm.xla_device()).empty_cache()
+        torch.cuda.empty_cache()
 
     return unpert_gen_tok_text, pert_gen_tok_texts, discrim_losses, losses_in_time
 
@@ -479,7 +461,6 @@ def generate_text_pplm(
     unpert_discrim_loss = 0
     loss_in_time = []
     for i in trange(length, ascii=True):
-
         # Get past/probs for current output, except for last word
         # Note that GPT takes 2 inputs: past + current_token
 
@@ -563,10 +544,9 @@ def generate_text_pplm(
 
         # Fuse the modified model and original model
         if perturb:
-
             unpert_probs = nn.functional.softmax(unpert_logits[:, -1, :], dim=-1)
 
-            pert_probs = (pert_probs ** gm_scale) * (unpert_probs ** (1 - gm_scale))  # + SMALL_CONST
+            pert_probs = (pert_probs**gm_scale) * (unpert_probs ** (1 - gm_scale))  # + SMALL_CONST
             pert_probs = top_k_filter(pert_probs, k=top_k, probs=True)  # + SMALL_CONST
 
             # rescale
@@ -587,11 +567,7 @@ def generate_text_pplm(
         # update context/output_so_far appending the new token
         output_so_far = last if output_so_far is None else torch.cat((output_so_far, last), dim=1)
 
-        print(output_so_far.tolist()[0])
-        if isinstance(tokenizer, Help_tokenizer):
-            print(tokenizer.decode(output_so_far.tolist()[0]))
-        else:
-            print(tokenizer.decode(output_so_far.tolist()[0]))
+        print(tokenizer.decode(output_so_far.tolist()[0]))
 
     return output_so_far, unpert_discrim_loss, loss_in_time
 
@@ -609,7 +585,7 @@ def set_generic_model_params(discrim_weights, discrim_meta):
 
 
 def run_pplm_example(
-    pretrained_model="gpt2-medium",
+    pretrained_model="openai-community/gpt2-medium",
     cond_text="",
     uncond=False,
     num_samples=1,
@@ -641,7 +617,7 @@ def run_pplm_example(
     np.random.seed(seed)
 
     # set the device
-    device = "cuda" if torch.to(xm.xla_device()).is_available() and not no_cuda else "cpu"
+    device = "cuda" if torch.cuda.is_available() and not no_cuda else "cpu"
 
     if discrim == "generic":
         set_generic_model_params(discrim_weights, discrim_meta)
@@ -656,12 +632,7 @@ def run_pplm_example(
     model.eval()
 
     # load tokenizer
-    try:
-        tokenizer = GPT2Tokenizer.from_pretrained(pretrained_model)
-    except:
-        from run_pplm_discrim_train import get_vocab_dict
-        vocab_dict = get_vocab_dict()
-        tokenizer = Help_tokenizer(vocab_dict)
+    tokenizer = GPT2Tokenizer.from_pretrained(pretrained_model)
 
     # Freeze GPT-2 weights
     for param in model.parameters():
@@ -670,43 +641,15 @@ def run_pplm_example(
     # figure out conditioning text
     if uncond:
         tokenized_cond_text = tokenizer.encode([tokenizer.bos_token])
-        # if isinstance(tokenizer, dict):
-        #     tokenized_cond_text = [tokenizer['START']]
-        # else:
-        #     tokenized_cond_text = tokenizer.encode([tokenizer.bos_token])
     else:
-        if isinstance(tokenizer, Help_tokenizer):
-            raw_text = cond_text
-            while not raw_text:
-                print("Did you forget to add `--cond_text`? ")
-                raw_text = input("Model prompt >>> ")
-            tokenized_cond_text = tokenizer.encode(raw_text)
-        else:
-            raw_text = cond_text
-            while not raw_text:
-                print("Did you forget to add `--cond_text`? ")
-                raw_text = input("Model prompt >>> ")
-            tokenized_cond_text = tokenizer.encode(tokenizer.bos_token + raw_text)
-
-        # if isinstance(tokenizer, dict):
-        #     raw_text = cond_text
-        #     while not raw_text:
-        #         print("Did you forget to add `--cond_text`? ")
-        #         raw_text = input("Model prompt >>> ")
-        #     tokenized_cond_text = [tokenizer[rr] for rr in raw_text.split()]
-        # else:
-            # raw_text = cond_text
-            # while not raw_text:
-            #     print("Did you forget to add `--cond_text`? ")
-            #     raw_text = input("Model prompt >>> ")
-            # tokenized_cond_text = tokenizer.encode(tokenizer.bos_token + raw_text)
+        raw_text = cond_text
+        while not raw_text:
+            print("Did you forget to add `--cond_text`? ")
+            raw_text = input("Model prompt >>> ")
+        tokenized_cond_text = tokenizer.encode(tokenizer.bos_token + raw_text)
 
     print("= Prefix of sentence =")
-    if isinstance(tokenizer, dict):
-        tokenizer_rev = {v:k for k,v in tokenizer.items()}
-        print( [tokenizer_rev[x] for x in tokenized_cond_text])
-    else:
-        print(tokenizer.decode(tokenized_cond_text))
+    print(tokenizer.decode(tokenized_cond_text))
     print()
 
     # generate unperturbed and perturbed texts
@@ -795,7 +738,7 @@ if __name__ == "__main__":
         "--pretrained_model",
         "-M",
         type=str,
-        default="gpt2-medium",
+        default="openai-community/gpt2-medium",
         help="pretrained model name or path to local checkpoint",
     )
     parser.add_argument("--cond_text", type=str, default="The lake", help="Prefix texts to condition on")

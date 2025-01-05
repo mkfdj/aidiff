@@ -13,7 +13,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-""" MPNet model configuration"""
+"""MPNet model configuration"""
 
 from ...configuration_utils import PretrainedConfig
 from ...utils import logging
@@ -21,17 +21,13 @@ from ...utils import logging
 
 logger = logging.get_logger(__name__)
 
-MPNET_PRETRAINED_CONFIG_ARCHIVE_MAP = {
-    "microsoft/mpnet-base": "https://huggingface.co/microsoft/mpnet-base/resolve/main/config.json",
-}
-
 
 class MPNetConfig(PretrainedConfig):
     r"""
     This is the configuration class to store the configuration of a [`MPNetModel`] or a [`TFMPNetModel`]. It is used to
     instantiate a MPNet model according to the specified arguments, defining the model architecture. Instantiating a
     configuration with the defaults will yield a similar configuration to that of the MPNet
-    [mpnet-base](https://huggingface.co/mpnet-base) architecture.
+    [microsoft/mpnet-base](https://huggingface.co/microsoft/mpnet-base) architecture.
 
     Configuration objects inherit from [`PretrainedConfig`] and can be used to control the model outputs. Read the
     documentation from [`PretrainedConfig`] for more information.
@@ -79,6 +75,7 @@ class MPNetConfig(PretrainedConfig):
     >>> # Accessing the model configuration
     >>> configuration = model.config
     ```"""
+
     model_type = "mpnet"
 
     def __init__(
@@ -114,3 +111,6 @@ class MPNetConfig(PretrainedConfig):
         self.initializer_range = initializer_range
         self.layer_norm_eps = layer_norm_eps
         self.relative_attention_num_buckets = relative_attention_num_buckets
+
+
+__all__ = ["MPNetConfig"]

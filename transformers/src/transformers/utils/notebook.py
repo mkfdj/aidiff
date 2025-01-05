@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import collections
 import re
 import time
 from typing import Optional
@@ -21,7 +20,7 @@ from typing import Optional
 import IPython.display as disp
 
 from ..trainer_callback import TrainerCallback
-from ..trainer_utils import IntervalStrategy
+from ..trainer_utils import IntervalStrategy, has_length
 
 
 def format_time(t):
@@ -115,13 +114,14 @@ class NotebookProgressBar:
         self.last_value = None
         self.comment = None
         self.output = None
+        self.value = None
+        self.label = None
 
     def update(self, value: int, force_update: bool = False, comment: str = None):
         """
         The main method to update the progress bar to `value`.
 
         Args:
-
             value (`int`):
                 The value to use. Must be between 0 and `total`.
             force_update (`bool`, *optional*, defaults to `False`):
@@ -163,7 +163,7 @@ class NotebookProgressBar:
             self.update_bar(value)
             self.last_value = value
             self.last_time = current_time
-            if self.average_time_per_item is None:
+            if (self.average_time_per_item is None) or (self.average_time_per_item == 0):
                 self.wait_for = 1
             else:
                 self.wait_for = max(int(self.update_every / self.average_time_per_item), 1)
@@ -175,8 +175,15 @@ class NotebookProgressBar:
         elif self.predicted_remaining is None:
             self.label = f"[{spaced_value}/{self.total} {format_time(self.elapsed_time)}"
         else:
-            self.label = f"[{spaced_value}/{self.total} {format_time(self.elapsed_time)} < {format_time(self.predicted_remaining)}"
-            self.label += f", {1/self.average_time_per_item:.2f} it/s"
+            self.label = (
+                f"[{spaced_value}/{self.total} {format_time(self.elapsed_time)} <"
+                f" {format_time(self.predicted_remaining)}"
+            )
+            if self.average_time_per_item == 0:
+                self.label += ", +inf it/s"
+            else:
+                self.label += f", {1/self.average_time_per_item:.2f} it/s"
+
         self.label += "]" if self.comment is None or len(self.comment) == 0 else f", {self.comment}]"
         self.display()
 
@@ -202,7 +209,6 @@ class NotebookTrainingTracker(NotebookProgressBar):
     An object tracking the updates of an ongoing training with progress bars and a nice table reporting metrics.
 
     Args:
-
         num_steps (`int`): The number of steps during training. column_names (`List[str]`, *optional*):
             The list of column names for the metrics table (will be inferred from the first call to
             [`~utils.notebook.NotebookTrainingTracker.write_line`] if not set).
@@ -235,13 +241,25 @@ class NotebookTrainingTracker(NotebookProgressBar):
             self.inner_table = [list(values.keys()), list(values.values())]
         else:
             columns = self.inner_table[0]
-            if len(self.inner_table) == 1:
-                # We give a chance to update the column names at the first iteration
-                for key in values.keys():
-                    if key not in columns:
-                        columns.append(key)
-                self.inner_table[0] = columns
-            self.inner_table.append([values[c] for c in columns])
+            for key in values.keys():
+                if key not in columns:
+                    columns.append(key)
+            self.inner_table[0] = columns
+            if len(self.inner_table) > 1:
+                last_values = self.inner_table[-1]
+                first_column = self.inner_table[0][0]
+                if last_values[0] != values[first_column]:
+                    # write new line
+                    self.inner_table.append([values[c] if c in values else "No Log" for c in columns])
+                else:
+                    # update last line
+                    new_values = values
+                    for c in columns:
+                        if c not in new_values.keys():
+                            new_values[c] = last_values[columns.index(c)]
+                    self.inner_table[-1] = [new_values[c] for c in columns]
+            else:
+                self.inner_table.append([values[c] for c in columns])
 
     def add_child(self, total, prefix=None, width=300):
         """
@@ -276,11 +294,11 @@ class NotebookProgressCallback(TrainerCallback):
         self._force_next_update = False
 
     def on_train_begin(self, args, state, control, **kwargs):
-        self.first_column = "Epoch" if args.evaluation_strategy == IntervalStrategy.EPOCH else "Step"
+        self.first_column = "Epoch" if args.eval_strategy == IntervalStrategy.EPOCH else "Step"
         self.training_loss = 0
         self.last_log = 0
         column_names = [self.first_column] + ["Training Loss"]
-        if args.evaluation_strategy != IntervalStrategy.NO:
+        if args.eval_strategy != IntervalStrategy.NO:
             column_names.append("Validation Loss")
         self.training_tracker = NotebookTrainingTracker(state.max_steps, column_names)
 
@@ -294,7 +312,7 @@ class NotebookProgressCallback(TrainerCallback):
         self._force_next_update = False
 
     def on_prediction_step(self, args, state, control, eval_dataloader=None, **kwargs):
-        if not isinstance(eval_dataloader.dataset, collections.abc.Sized):
+        if not has_length(eval_dataloader):
             return
         if self.prediction_bar is None:
             if self.training_tracker is not None:
@@ -305,9 +323,14 @@ class NotebookProgressCallback(TrainerCallback):
         else:
             self.prediction_bar.update(self.prediction_bar.value + 1)
 
+    def on_predict(self, args, state, control, **kwargs):
+        if self.prediction_bar is not None:
+            self.prediction_bar.close()
+        self.prediction_bar = None
+
     def on_log(self, args, state, control, logs=None, **kwargs):
         # Only for when there is no evaluation
-        if args.evaluation_strategy == IntervalStrategy.NO and "loss" in logs:
+        if args.eval_strategy == IntervalStrategy.NO and "loss" in logs:
             values = {"Training Loss": logs["loss"]}
             # First column is necessarily Step sine we're not in epoch eval strategy
             values["Step"] = state.global_step
@@ -334,13 +357,14 @@ class NotebookProgressCallback(TrainerCallback):
             _ = metrics.pop(f"{metric_key_prefix}_runtime", None)
             _ = metrics.pop(f"{metric_key_prefix}_samples_per_second", None)
             _ = metrics.pop(f"{metric_key_prefix}_steps_per_second", None)
+            _ = metrics.pop(f"{metric_key_prefix}_jit_compilation_time", None)
             for k, v in metrics.items():
-                if k == f"{metric_key_prefix}_loss":
-                    values["Validation Loss"] = v
-                else:
-                    splits = k.split("_")
-                    name = " ".join([part.capitalize() for part in splits[1:]])
-                    values[name] = v
+                splits = k.split("_")
+                name = " ".join([part.capitalize() for part in splits[1:]])
+                if name == "Loss":
+                    # Single dataset
+                    name = "Validation Loss"
+                values[name] = v
             self.training_tracker.write_line(values)
             self.training_tracker.remove_child()
             self.prediction_bar = None
@@ -349,6 +373,8 @@ class NotebookProgressCallback(TrainerCallback):
 
     def on_train_end(self, args, state, control, **kwargs):
         self.training_tracker.update(
-            state.global_step, comment=f"Epoch {int(state.epoch)}/{state.num_train_epochs}", force_update=True
+            state.global_step,
+            comment=f"Epoch {int(state.epoch)}/{state.num_train_epochs}",
+            force_update=True,
         )
         self.training_tracker = None

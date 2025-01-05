@@ -30,20 +30,17 @@ Required:
 ## Setup the environment with Dockerfile
 
 Under the directory of `transformers/`, build the docker image:
-```
+```bash
 docker build . -f examples/research_projects/quantization-qdqbert/Dockerfile -t bert_quantization:latest
 ```
 
 Run the docker:
-```
+```bash
 docker run --gpus all --privileged --rm -it --shm-size=1g --ulimit memlock=-1 --ulimit stack=67108864 bert_quantization:latest
 ```
 
-*Note that the current NGC pytorch container (pytorch:21.07-py3) has TensorRT 8.0 which doesn't meet the requiremnt of TensorRT >= 8.2. One can either update the Dockerfile with the latest [NGC pytorch container](https://catalog.ngc.nvidia.com/orgs/nvidia/containers/pytorch) once it supports TensorRT 8.2, or manually download and install [TensorRT >= 8.2](https://developer.nvidia.com/nvidia-tensorrt-download) in the container.*
-
-
 In the container:
-```
+```bash
 cd transformers/examples/research_projects/quantization-qdqbert/
 ```
 
@@ -51,21 +48,21 @@ cd transformers/examples/research_projects/quantization-qdqbert/
 
 Calibrate the pretrained model and finetune with quantization awared:
 
-```
+```bash
 python3 run_quant_qa.py \
-  --model_name_or_path bert-base-uncased \
+  --model_name_or_path google-bert/bert-base-uncased \
   --dataset_name squad \
   --max_seq_length 128 \
   --doc_stride 32 \
-  --output_dir calib/bert-base-uncased \
+  --output_dir calib/google-bert/bert-base-uncased \
   --do_calib \
   --calibrator percentile \
   --percentile 99.99
 ```
 
-```
+```bash
 python3 run_quant_qa.py \
-  --model_name_or_path calib/bert-base-uncased \
+  --model_name_or_path calib/google-bert/bert-base-uncased \
   --dataset_name squad \
   --do_train \
   --do_eval \
@@ -74,8 +71,8 @@ python3 run_quant_qa.py \
   --num_train_epochs 2 \
   --max_seq_length 128 \
   --doc_stride 32 \
-  --output_dir finetuned_int8/bert-base-uncased \
-  --tokenizer_name bert-base-uncased \
+  --output_dir finetuned_int8/google-bert/bert-base-uncased \
+  --tokenizer_name google-bert/bert-base-uncased \
   --save_steps 0
 ```
 
@@ -83,16 +80,16 @@ python3 run_quant_qa.py \
 
 To export the QAT model finetuned above:
 
-```
+```bash
 python3 run_quant_qa.py \
-  --model_name_or_path finetuned_int8/bert-base-uncased \
+  --model_name_or_path finetuned_int8/google-bert/bert-base-uncased \
   --output_dir ./ \
   --save_onnx \
   --per_device_eval_batch_size 1 \
   --max_seq_length 128 \
   --doc_stride 32 \
   --dataset_name squad \
-  --tokenizer_name bert-base-uncased
+  --tokenizer_name google-bert/bert-base-uncased
 ```
 
 Use `--recalibrate-weights` to calibrate the weight ranges according to the quantizer axis. Use `--quant-per-tensor` for per tensor quantization (default is per channel).
@@ -100,13 +97,19 @@ Recalibrating will affect the accuracy of the model, but the change should be mi
 
 ### Benchmark the INT8 QAT ONNX model inference with TensorRT using dummy input
 
-```
+```bash
 trtexec --onnx=model.onnx --explicitBatch --workspace=16384 --int8 --shapes=input_ids:64x128,attention_mask:64x128,token_type_ids:64x128 --verbose
+```
+
+### Benchmark the INT8 QAT ONNX model inference with [ONNX Runtime-TRT](https://onnxruntime.ai/docs/execution-providers/TensorRT-ExecutionProvider.html) using dummy input
+
+```bash
+python3 ort-infer-benchmark.py
 ```
 
 ### Evaluate the INT8 QAT ONNX model inference with TensorRT
 
-```
+```bash
 python3 evaluate-hf-trt-qa.py \
   --onnx_model_path=./model.onnx \
   --output_dir ./ \
@@ -114,7 +117,7 @@ python3 evaluate-hf-trt-qa.py \
   --max_seq_length 128 \
   --doc_stride 32 \
   --dataset_name squad \
-  --tokenizer_name bert-base-uncased \
+  --tokenizer_name google-bert/bert-base-uncased \
   --int8 \
   --seed 42
 ```
@@ -123,16 +126,16 @@ python3 evaluate-hf-trt-qa.py \
 
 Finetune a fp32 precision model with [transformers/examples/pytorch/question-answering/](../../pytorch/question-answering/):
 
-```
+```bash
 python3 ../../pytorch/question-answering/run_qa.py \
-  --model_name_or_path bert-base-uncased \
+  --model_name_or_path google-bert/bert-base-uncased \
   --dataset_name squad \
   --per_device_train_batch_size 12 \
   --learning_rate 3e-5 \
   --num_train_epochs 2 \
   --max_seq_length 128 \
   --doc_stride 32 \
-  --output_dir ./finetuned_fp32/bert-base-uncased \
+  --output_dir ./finetuned_fp32/google-bert/bert-base-uncased \
   --save_steps 0 \
   --do_train \
   --do_eval
@@ -142,15 +145,15 @@ python3 ../../pytorch/question-answering/run_qa.py \
 
 ### PTQ by calibrating and evaluating the finetuned FP32 model above:
 
-```
+```bash
 python3 run_quant_qa.py \
-  --model_name_or_path ./finetuned_fp32/bert-base-uncased \
+  --model_name_or_path ./finetuned_fp32/google-bert/bert-base-uncased \
   --dataset_name squad \
   --calibrator percentile \
   --percentile 99.99 \
   --max_seq_length 128 \
   --doc_stride 32 \
-  --output_dir ./calib/bert-base-uncased \
+  --output_dir ./calib/google-bert/bert-base-uncased \
   --save_steps 0 \
   --do_calib \
   --do_eval
@@ -158,21 +161,21 @@ python3 run_quant_qa.py \
 
 ### Export the INT8 PTQ model to ONNX
 
-```
+```bash
 python3 run_quant_qa.py \
-  --model_name_or_path ./calib/bert-base-uncased \
+  --model_name_or_path ./calib/google-bert/bert-base-uncased \
   --output_dir ./ \
   --save_onnx \
   --per_device_eval_batch_size 1 \
   --max_seq_length 128 \
   --doc_stride 32 \
   --dataset_name squad \
-  --tokenizer_name bert-base-uncased
+  --tokenizer_name google-bert/bert-base-uncased
 ```
 
 ### Evaluate the INT8 PTQ ONNX model inference with TensorRT
 
-```
+```bash
 python3 evaluate-hf-trt-qa.py \
   --onnx_model_path=./model.onnx \
   --output_dir ./ \
@@ -180,7 +183,7 @@ python3 evaluate-hf-trt-qa.py \
   --max_seq_length 128 \
   --doc_stride 32 \
   --dataset_name squad \
-  --tokenizer_name bert-base-uncased \
+  --tokenizer_name google-bert/bert-base-uncased \
   --int8 \
   --seed 42
 ```

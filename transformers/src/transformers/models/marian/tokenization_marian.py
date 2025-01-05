@@ -15,7 +15,6 @@ import json
 import os
 import re
 import warnings
-from contextlib import contextmanager
 from pathlib import Path
 from shutil import copyfile
 from typing import Any, Dict, List, Optional, Tuple, Union
@@ -32,26 +31,12 @@ VOCAB_FILES_NAMES = {
     "source_spm": "source.spm",
     "target_spm": "target.spm",
     "vocab": "vocab.json",
+    "target_vocab_file": "target_vocab.json",
     "tokenizer_config_file": "tokenizer_config.json",
 }
 
-PRETRAINED_VOCAB_FILES_MAP = {
-    "source_spm": {
-        "Helsinki-NLP/opus-mt-en-de": "https://huggingface.co/Helsinki-NLP/opus-mt-en-de/resolve/main/source.spm"
-    },
-    "target_spm": {
-        "Helsinki-NLP/opus-mt-en-de": "https://huggingface.co/Helsinki-NLP/opus-mt-en-de/resolve/main/target.spm"
-    },
-    "vocab": {
-        "Helsinki-NLP/opus-mt-en-de": "https://huggingface.co/Helsinki-NLP/opus-mt-en-de/resolve/main/vocab.json"
-    },
-    "tokenizer_config_file": {
-        "Helsinki-NLP/opus-mt-en-de": "https://huggingface.co/Helsinki-NLP/opus-mt-en-de/resolve/main/tokenizer_config.json"
-    },
-}
 
-PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {"Helsinki-NLP/opus-mt-en-de": 512}
-PRETRAINED_INIT_CONFIGURATION = {}
+SPIECE_UNDERLINE = "▁"
 
 # Example URL https://huggingface.co/Helsinki-NLP/opus-mt-en-de/resolve/main/vocab.json
 
@@ -104,32 +89,27 @@ class MarianTokenizer(PreTrainedTokenizer):
     Examples:
 
     ```python
-    >>> from transformers import MarianTokenizer
+    >>> from transformers import MarianForCausalLM, MarianTokenizer
 
+    >>> model = MarianForCausalLM.from_pretrained("Helsinki-NLP/opus-mt-en-de")
     >>> tokenizer = MarianTokenizer.from_pretrained("Helsinki-NLP/opus-mt-en-de")
     >>> src_texts = ["I am a small frog.", "Tom asked his teacher for advice."]
     >>> tgt_texts = ["Ich bin ein kleiner Frosch.", "Tom bat seinen Lehrer um Rat."]  # optional
-    >>> inputs = tokenizer(src_texts, return_tensors="pt", padding=True)
-    >>> with tokenizer.as_target_tokenizer():
-    ...     labels = tokenizer(tgt_texts, return_tensors="pt", padding=True)
-    >>> inputs["labels"] = labels["input_ids"]
-    # keys  [input_ids, attention_mask, labels].
+    >>> inputs = tokenizer(src_texts, text_target=tgt_texts, return_tensors="pt", padding=True)
 
     >>> outputs = model(**inputs)  # should work
     ```"""
 
     vocab_files_names = VOCAB_FILES_NAMES
-    pretrained_vocab_files_map = PRETRAINED_VOCAB_FILES_MAP
-    pretrained_init_configuration = PRETRAINED_INIT_CONFIGURATION
-    max_model_input_sizes = PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES
     model_input_names = ["input_ids", "attention_mask"]
     language_code_re = re.compile(">>.+<<")  # type: re.Pattern
 
     def __init__(
         self,
-        vocab,
         source_spm,
         target_spm,
+        vocab,
+        target_vocab_file=None,
         source_lang=None,
         target_lang=None,
         unk_token="<unk>",
@@ -137,9 +117,40 @@ class MarianTokenizer(PreTrainedTokenizer):
         pad_token="<pad>",
         model_max_length=512,
         sp_model_kwargs: Optional[Dict[str, Any]] = None,
-        **kwargs
+        separate_vocabs=False,
+        **kwargs,
     ) -> None:
         self.sp_model_kwargs = {} if sp_model_kwargs is None else sp_model_kwargs
+
+        assert Path(source_spm).exists(), f"cannot find spm source {source_spm}"
+
+        self.separate_vocabs = separate_vocabs
+        self.encoder = load_json(vocab)
+        if str(unk_token) not in self.encoder:
+            raise KeyError("<unk> token must be in the vocab")
+        assert str(pad_token) in self.encoder
+
+        if separate_vocabs:
+            self.target_encoder = load_json(target_vocab_file)
+            self.decoder = {v: k for k, v in self.target_encoder.items()}
+            self.supported_language_codes = []
+        else:
+            self.decoder = {v: k for k, v in self.encoder.items()}
+            self.supported_language_codes: list = [k for k in self.encoder if k.startswith(">>") and k.endswith("<<")]
+
+        self.source_lang = source_lang
+        self.target_lang = target_lang
+        self.spm_files = [source_spm, target_spm]
+
+        # load SentencePiece model for pre-processing
+        self.spm_source = load_spm(source_spm, self.sp_model_kwargs)
+        self.spm_target = load_spm(target_spm, self.sp_model_kwargs)
+        self.current_spm = self.spm_source
+        self.current_encoder = self.encoder
+
+        # Multilingual target side: default to using first supported language code.
+
+        self._setup_normalizer()
 
         super().__init__(
             # bos_token=bos_token,  unused. Start decoding with config.decoder_start_token_id
@@ -150,28 +161,10 @@ class MarianTokenizer(PreTrainedTokenizer):
             pad_token=pad_token,
             model_max_length=model_max_length,
             sp_model_kwargs=self.sp_model_kwargs,
+            target_vocab_file=target_vocab_file,
+            separate_vocabs=separate_vocabs,
             **kwargs,
         )
-        assert Path(source_spm).exists(), f"cannot find spm source {source_spm}"
-        self.encoder = load_json(vocab)
-        if self.unk_token not in self.encoder:
-            raise KeyError("<unk> token must be in vocab")
-        assert self.pad_token in self.encoder
-        self.decoder = {v: k for k, v in self.encoder.items()}
-
-        self.source_lang = source_lang
-        self.target_lang = target_lang
-        self.supported_language_codes: list = [k for k in self.encoder if k.startswith(">>") and k.endswith("<<")]
-        self.spm_files = [source_spm, target_spm]
-
-        # load SentencePiece model for pre-processing
-        self.spm_source = load_spm(source_spm, self.sp_model_kwargs)
-        self.spm_target = load_spm(target_spm, self.sp_model_kwargs)
-        self.current_spm = self.spm_source
-
-        # Multilingual target side: default to using first supported language code.
-
-        self._setup_normalizer()
 
     def _setup_normalizer(self):
         try:
@@ -187,7 +180,7 @@ class MarianTokenizer(PreTrainedTokenizer):
         return self.punc_normalizer(x) if x else ""
 
     def _convert_token_to_id(self, token):
-        return self.encoder.get(token, self.encoder[self.unk_token])
+        return self.current_encoder.get(token, self.current_encoder[self.unk_token])
 
     def remove_language_code(self, text: str):
         """Remove language codes like >>fr<< before sentencepiece"""
@@ -213,8 +206,9 @@ class MarianTokenizer(PreTrainedTokenizer):
                 List of tokenized input ids. Can be obtained using the `__call__` method.
             skip_special_tokens (`bool`, *optional*, defaults to `False`):
                 Whether or not to remove special tokens in the decoding.
-            clean_up_tokenization_spaces (`bool`, *optional*, defaults to `True`):
-                Whether or not to clean up the tokenization spaces.
+            clean_up_tokenization_spaces (`bool`, *optional*):
+                Whether or not to clean up the tokenization spaces. If `None`, will default to
+                `self.clean_up_tokenization_spaces` (available in the `tokenizer_config`).
             use_source_tokenizer (`bool`, *optional*, defaults to `False`):
                 Whether or not to use the source tokenizer to decode sequences (only applicable in sequence-to-sequence
                 problems).
@@ -238,8 +232,9 @@ class MarianTokenizer(PreTrainedTokenizer):
                 List of tokenized input ids. Can be obtained using the `__call__` method.
             skip_special_tokens (`bool`, *optional*, defaults to `False`):
                 Whether or not to remove special tokens in the decoding.
-            clean_up_tokenization_spaces (`bool`, *optional*, defaults to `True`):
-                Whether or not to clean up the tokenization spaces.
+            clean_up_tokenization_spaces (`bool`, *optional*):
+                Whether or not to clean up the tokenization spaces. If `None`, will default to
+                `self.clean_up_tokenization_spaces` (available in the `tokenizer_config`).
             use_source_tokenizer (`bool`, *optional*, defaults to `False`):
                 Whether or not to use the source tokenizer to decode sequences (only applicable in sequence-to-sequence
                 problems).
@@ -253,10 +248,19 @@ class MarianTokenizer(PreTrainedTokenizer):
 
     def convert_tokens_to_string(self, tokens: List[str]) -> str:
         """Uses source spm if _decode_use_source_tokenizer is True, and target spm otherwise"""
-        if self._decode_use_source_tokenizer:
-            return self.spm_source.DecodePieces(tokens)
-        else:
-            return self.spm_target.DecodePieces(tokens)
+        sp_model = self.spm_source if self._decode_use_source_tokenizer else self.spm_target
+        current_sub_tokens = []
+        out_string = ""
+        for token in tokens:
+            # make sure that special tokens are not decoded using sentencepiece model
+            if token in self.all_special_tokens:
+                out_string += sp_model.decode_pieces(current_sub_tokens) + token + " "
+                current_sub_tokens = []
+            else:
+                current_sub_tokens.append(token)
+        out_string += sp_model.decode_pieces(current_sub_tokens)
+        out_string = out_string.replace(SPIECE_UNDERLINE, " ")
+        return out_string.strip()
 
     def build_inputs_with_special_tokens(self, token_ids_0, token_ids_1=None) -> List[int]:
         """Build model inputs from a sequence by appending eos_token_id."""
@@ -265,15 +269,14 @@ class MarianTokenizer(PreTrainedTokenizer):
         # We don't expect to process pairs, but leave the pair logic for API consistency
         return token_ids_0 + token_ids_1 + [self.eos_token_id]
 
-    @contextmanager
-    def as_target_tokenizer(self):
-        """
-        Temporarily sets the tokenizer for encoding the targets. Useful for tokenizer associated to
-        sequence-to-sequence models that need a slightly different processing for the labels.
-        """
-        self.current_spm = self.spm_target
-        yield
+    def _switch_to_input_mode(self):
         self.current_spm = self.spm_source
+        self.current_encoder = self.encoder
+
+    def _switch_to_target_mode(self):
+        self.current_spm = self.spm_target
+        if self.separate_vocabs:
+            self.current_encoder = self.target_encoder
 
     @property
     def vocab_size(self) -> int:
@@ -284,12 +287,26 @@ class MarianTokenizer(PreTrainedTokenizer):
             logger.error(f"Vocabulary path ({save_directory}) should be a directory")
             return
         saved_files = []
-        out_vocab_file = os.path.join(
-            save_directory, (filename_prefix + "-" if filename_prefix else "") + VOCAB_FILES_NAMES["vocab"]
-        )
 
-        save_json(self.encoder, out_vocab_file)
-        saved_files.append(out_vocab_file)
+        if self.separate_vocabs:
+            out_src_vocab_file = os.path.join(
+                save_directory,
+                (filename_prefix + "-" if filename_prefix else "") + VOCAB_FILES_NAMES["vocab"],
+            )
+            out_tgt_vocab_file = os.path.join(
+                save_directory,
+                (filename_prefix + "-" if filename_prefix else "") + VOCAB_FILES_NAMES["target_vocab_file"],
+            )
+            save_json(self.encoder, out_src_vocab_file)
+            save_json(self.target_encoder, out_tgt_vocab_file)
+            saved_files.append(out_src_vocab_file)
+            saved_files.append(out_tgt_vocab_file)
+        else:
+            out_vocab_file = os.path.join(
+                save_directory, (filename_prefix + "-" if filename_prefix else "") + VOCAB_FILES_NAMES["vocab"]
+            )
+            save_json(self.encoder, out_vocab_file)
+            saved_files.append(out_vocab_file)
 
         for spm_save_filename, spm_orig_path, spm_model in zip(
             [VOCAB_FILES_NAMES["source_spm"], VOCAB_FILES_NAMES["target_spm"]],
@@ -311,13 +328,19 @@ class MarianTokenizer(PreTrainedTokenizer):
         return tuple(saved_files)
 
     def get_vocab(self) -> Dict:
-        vocab = self.encoder.copy()
-        vocab.update(self.added_tokens_encoder)
-        return vocab
+        return self.get_src_vocab()
+
+    def get_src_vocab(self):
+        return dict(self.encoder, **self.added_tokens_encoder)
+
+    def get_tgt_vocab(self):
+        return dict(self.target_encoder, **self.added_tokens_decoder)
 
     def __getstate__(self) -> Dict:
         state = self.__dict__.copy()
-        state.update({k: None for k in ["spm_source", "spm_target", "current_spm", "punc_normalizer"]})
+        state.update(
+            {k: None for k in ["spm_source", "spm_target", "current_spm", "punc_normalizer", "target_vocab_file"]}
+        )
         return state
 
     def __setstate__(self, d: Dict) -> None:
@@ -366,3 +389,6 @@ def save_json(data, path: str) -> None:
 def load_json(path: str) -> Union[Dict, List]:
     with open(path, "r") as f:
         return json.load(f)
+
+
+__all__ = ["MarianTokenizer"]

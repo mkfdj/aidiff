@@ -15,11 +15,11 @@
 Count remaining (non-zero) weights in the encoder (i.e. the transformer layers).
 Sparsity and remaining weights levels are equivalent: sparsity % = 100 - remaining weights %.
 """
+
 import argparse
 import os
 
 import torch
-
 from emmental.modules import ThresholdBinarizer, TopKBinarizer
 
 
@@ -70,15 +70,20 @@ if __name__ == "__main__":
         choices=["l0", "topK", "sigmoied_threshold"],
         type=str,
         required=True,
-        help="Pruning Method (l0 = L0 regularization, topK = Movement pruning, sigmoied_threshold = Soft movement pruning)",
+        help=(
+            "Pruning Method (l0 = L0 regularization, topK = Movement pruning, sigmoied_threshold = Soft movement"
+            " pruning)"
+        ),
     )
     parser.add_argument(
         "--threshold",
         type=float,
         required=False,
-        help="For `topK`, it is the level of remaining weights (in %) in the fine-pruned model."
-        "For `sigmoied_threshold`, it is the threshold \tau against which the (sigmoied) scores are compared."
-        "Not needed for `l0`",
+        help=(
+            "For `topK`, it is the level of remaining weights (in %) in the fine-pruned model. "
+            "For `sigmoied_threshold`, it is the threshold \tau against which the (sigmoied) scores are compared. "
+            "Not needed for `l0`"
+        ),
     )
     parser.add_argument(
         "--serialization_dir",
