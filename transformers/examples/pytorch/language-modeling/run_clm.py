@@ -28,9 +28,9 @@ import sys
 from dataclasses import dataclass, field
 from itertools import chain
 from typing import Optional
-import torch
 import datasets
 import stanza
+import torch
 import torch_xla.core.xla_model as xm
 import spacy_stanza
 from datasets import load_dataset, load_metric
@@ -551,6 +551,7 @@ def main():
     set_seed(training_args.seed)
     
     if xm.xla_device() is not None:
+        global torch
         training_args.device = torch.device("xla")
         logger.warning("TPU was successfully detected. Using TPU")
     else:
