@@ -149,6 +149,31 @@ class ModelArguments:
             )
         },
     )
+    
+    experiment: Optional[str] = field(
+        default=None,
+        metadata={"help": "Experiment name for tracking purposes"}
+    )
+    
+    task: Optional[str] = field(
+        default=None,
+        metadata={"help": "Task type for the model"}
+    )
+    
+    init_emb: Optional[str] = field(
+        default=None,
+        metadata={"help": "Path to initial embedding model"}
+    )
+    
+    n_embd: Optional[int] = field(
+        default=None,
+        metadata={"help": "Number of embedding dimensions"}
+    )
+    
+    learned_emb: Optional[str] = field(
+        default=None,
+        metadata={"help": "Whether to use learned embeddings (yes/no)"}
+    )
 
     def __post_init__(self):
         if self.config_overrides is not None and (self.config_name is not None or self.model_name_or_path is not None):
