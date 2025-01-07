@@ -317,7 +317,18 @@ def main():
                 "the `--output_dir` or add `--overwrite_output_dir` to train from scratch."
             )
 
-    # Set seed before initializing model.
+    # Initialize TPU if available
+    if training_args.tpu_num_cores:
+        import torch_xla.core.xla_model as xm
+        import torch_xla.distributed.xla_multiprocessing as xmp
+        device = xm.xla_device()
+        training_args.device = device
+        training_args.n_gpu = 1
+    else:
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        training_args.device = device
+
+    # Set seed after device initialization
     set_seed(training_args.seed)
 
     # Get the datasets: you can either provide your own CSV/JSON/TXT training and evaluation files (see below)
