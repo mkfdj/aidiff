@@ -317,16 +317,30 @@ def main():
                 "the `--output_dir` or add `--overwrite_output_dir` to train from scratch."
             )
 
-    # Initialize TPU if available
-    if training_args.tpu_num_cores:
-        import torch_xla.core.xla_model as xm
-        import torch_xla.distributed.xla_multiprocessing as xmp
-        device = xm.xla_device()
+    # Initialize device with fallback handling
+    device = None
+    try:
+        if training_args.tpu_num_cores:
+            import torch_xla.core.xla_model as xm
+            import torch_xla.distributed.xla_multiprocessing as xmp
+            try:
+                device = xm.xla_device()
+                training_args.device = device
+                training_args.n_gpu = 1
+                logger.info("Successfully initialized TPU device")
+            except Exception as tpu_err:
+                logger.warning(f"TPU initialization failed: {tpu_err}")
+                logger.warning("Falling back to CPU/GPU")
+                device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+                training_args.device = device
+        else:
+            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+            training_args.device = device
+    except Exception as device_err:
+        logger.error(f"Device initialization failed: {device_err}")
+        device = torch.device("cpu")
         training_args.device = device
-        training_args.n_gpu = 1
-    else:
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        training_args.device = device
+        logger.warning("Using CPU as fallback device")
 
     # Set seed after device initialization
     set_seed(training_args.seed)
