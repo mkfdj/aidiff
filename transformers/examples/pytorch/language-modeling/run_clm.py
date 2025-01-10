@@ -317,42 +317,63 @@ def main():
                 "the `--output_dir` or add `--overwrite_output_dir` to train from scratch."
             )
 
-    # Initialize device with fallback handling
+    # Initialize device with robust fallback handling
     device = None
     try:
+        # First try GPU if available
+        if torch.cuda.is_available():
+            device = torch.device("cuda")
+            training_args.device = device
+            logger.info("Using CUDA device")
+            return
+    except Exception as gpu_err:
+        logger.warning(f"CUDA initialization failed: {gpu_err}")
+
+    try:
+        # Then try TPU if specified
         if training_args.tpu_num_cores:
             import os
             from torch_xla.distributed import xla_multiprocessing as xmp
             
-            # Remove problematic TPU environment variables
-            os.environ.pop('TPU_PROCESS_ADDRESSES', None)
-            os.environ.pop('CLOUD_TPU_TASK_ID', None)
+            # Clean up TPU environment variables
+            for env_var in ['TPU_PROCESS_ADDRESSES', 'CLOUD_TPU_TASK_ID', 'XRT_TPU_CONFIG']:
+                os.environ.pop(env_var, None)
             
             def _mp_fn(index):
-                from accelerate import Accelerator
-                accelerator = Accelerator()
-                if accelerator.is_main_process:
-                    device = torch.device("xla")
+                try:
+                    from accelerate import Accelerator
+                    accelerator = Accelerator()
+                    if accelerator.is_main_process:
+                        device = torch.device("xla")
+                        training_args.device = device
+                        training_args.n_gpu = 1
+                        logger.info("Using main process for TPU initialization")
+                    else:
+                        device = torch.device("xla")
+                        training_args.device = device
+                        logger.info("Using secondary process for TPU initialization")
+                    return main()
+                except Exception as tpu_err:
+                    logger.error(f"TPU initialization failed: {tpu_err}")
+                    device = torch.device("cpu")
                     training_args.device = device
-                    training_args.n_gpu = 1
-                    logger.info("Using main process for TPU initialization")
-                else:
-                    device = torch.device("xla")
-                    training_args.device = device
-                    logger.info("Using secondary process for TPU initialization")
-                return main()
+                    logger.warning("Falling back to CPU after TPU failure")
+                    return main()
             
             # Use xmp.spawn with fork start method
-            xmp.spawn(_mp_fn, args=(), nprocs=training_args.tpu_num_cores, start_method='fork')
-            return
-        else:
-            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-            training_args.device = device
-    except Exception as device_err:
-        logger.error(f"Device initialization failed: {device_err}")
-        device = torch.device("cpu")
-        training_args.device = device
-        logger.warning("Using CPU as fallback device")
+            try:
+                xmp.spawn(_mp_fn, args=(), nprocs=training_args.tpu_num_cores, start_method='fork')
+                return
+            except Exception as spawn_err:
+                logger.error(f"TPU spawn failed: {spawn_err}")
+                raise
+    except Exception as tpu_init_err:
+        logger.error(f"TPU initialization failed: {tpu_init_err}")
+
+    # Fallback to CPU if all else fails
+    device = torch.device("cpu")
+    training_args.device = device
+    logger.warning("Using CPU as fallback device")
 
     # Set seed after device initialization
     set_seed(training_args.seed)
