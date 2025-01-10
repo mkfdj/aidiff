@@ -321,17 +321,30 @@ def main():
     device = None
     try:
         if training_args.tpu_num_cores:
-            from accelerate import Accelerator
-            accelerator = Accelerator()
-            if accelerator.is_main_process:
-                device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-                training_args.device = device
-                training_args.n_gpu = 1
-                logger.info("Using main process for TPU initialization")
-            else:
-                device = torch.device("cpu")
-                training_args.device = device
-                logger.info("Using secondary process for TPU initialization")
+            import os
+            from torch_xla.distributed import xla_multiprocessing as xmp
+            
+            # Remove problematic TPU environment variables
+            os.environ.pop('TPU_PROCESS_ADDRESSES', None)
+            os.environ.pop('CLOUD_TPU_TASK_ID', None)
+            
+            def _mp_fn(index):
+                from accelerate import Accelerator
+                accelerator = Accelerator()
+                if accelerator.is_main_process:
+                    device = torch.device("xla")
+                    training_args.device = device
+                    training_args.n_gpu = 1
+                    logger.info("Using main process for TPU initialization")
+                else:
+                    device = torch.device("xla")
+                    training_args.device = device
+                    logger.info("Using secondary process for TPU initialization")
+                return main()
+            
+            # Use xmp.spawn with fork start method
+            xmp.spawn(_mp_fn, args=(), nprocs=training_args.tpu_num_cores, start_method='fork')
+            return
         else:
             device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
             training_args.device = device
